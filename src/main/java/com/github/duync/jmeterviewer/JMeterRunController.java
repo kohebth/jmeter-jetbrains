@@ -46,7 +46,7 @@ final class JMeterRunController {
                 options.apply();
             }
 
-            HashTree testTree = JMeterTreeLoader.toHashTree(model);
+            HashTree testTree = JMeterTreeLoader.toRunHashTree(model);
             JMeterRunTreePreparer.prepare(testTree);
             engines.clear();
             engines.addAll(createEngines(options, target));

@@ -34,6 +34,14 @@ final class JMeterTreeLoader {
     }
 
     static HashTree toHashTree(JMeterTreeModel model) {
+        return toHashTree(model, false);
+    }
+
+    static HashTree toRunHashTree(JMeterTreeModel model) {
+        return toHashTree(model, true);
+    }
+
+    private static HashTree toHashTree(JMeterTreeModel model, boolean cloneElements) {
         JMeterTreeNode rootNode = (JMeterTreeNode) model.getRoot();
         if (rootNode.getChildCount() == 0) {
             throw new IllegalArgumentException("JMeter tree does not contain a test plan");
@@ -42,7 +50,7 @@ final class JMeterTreeLoader {
         HashTree tree = new HashTree();
         for (int i = 0; i < rootNode.getChildCount(); i++) {
             JMeterTreeNode child = (JMeterTreeNode) rootNode.getChildAt(i);
-            tree.add(child.getTestElement(), childrenToHashTree(child));
+            tree.add(element(child, cloneElements), childrenToHashTree(child, cloneElements));
         }
         return tree;
     }
@@ -92,11 +100,20 @@ final class JMeterTreeLoader {
     }
 
     private static HashTree childrenToHashTree(JMeterTreeNode parent) {
+        return childrenToHashTree(parent, false);
+    }
+
+    private static HashTree childrenToHashTree(JMeterTreeNode parent, boolean cloneElements) {
         HashTree tree = new HashTree();
         for (int i = 0; i < parent.getChildCount(); i++) {
             JMeterTreeNode child = (JMeterTreeNode) parent.getChildAt(i);
-            tree.add(child.getTestElement(), childrenToHashTree(child));
+            tree.add(element(child, cloneElements), childrenToHashTree(child, cloneElements));
         }
         return tree;
+    }
+
+    private static TestElement element(JMeterTreeNode node, boolean cloneElement) {
+        TestElement element = node.getTestElement();
+        return cloneElement ? (TestElement) element.clone() : element;
     }
 }

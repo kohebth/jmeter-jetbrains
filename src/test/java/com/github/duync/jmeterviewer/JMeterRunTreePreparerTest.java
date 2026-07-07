@@ -2,6 +2,9 @@ package com.github.duync.jmeterviewer;
 
 import org.apache.jmeter.control.Controller;
 import org.apache.jmeter.control.LoopController;
+import org.apache.jmeter.gui.tree.JMeterTreeModel;
+import org.apache.jmeter.gui.tree.JMeterTreeNode;
+import org.apache.jmeter.testelement.TestPlan;
 import org.apache.jmeter.threads.AbstractThreadGroup;
 import org.apache.jmeter.threads.ThreadGroup;
 import org.apache.jorphan.collections.HashTree;
@@ -59,5 +62,23 @@ final class JMeterRunTreePreparerTest {
         LoopController prepared = assertInstanceOf(LoopController.class, threadGroup.getSamplerController());
         assertEquals(2, prepared.getLoops());
         assertFalse(prepared.getPropertyAsBoolean("LoopController.continue_forever"));
+    }
+
+    @Test
+    void runPreparationDoesNotMutateEditorModel() {
+        JMeterTreeModel model = new JMeterTreeModel(new TestPlan("Plan"));
+        JMeterTreeNode testPlan = (JMeterTreeNode) ((JMeterTreeNode) model.getRoot()).getChildAt(0);
+        ThreadGroup threadGroup = new ThreadGroup();
+        LoopController loopController = new LoopController();
+        loopController.setLoops(2);
+        threadGroup.setSamplerController(loopController);
+        loopController.setContinueForever(true);
+        model.insertNodeInto(new JMeterTreeNode(threadGroup, model), testPlan, testPlan.getChildCount());
+
+        HashTree runTree = JMeterTreeLoader.toRunHashTree(model);
+        JMeterRunTreePreparer.prepare(runTree);
+
+        LoopController editorLoop = assertInstanceOf(LoopController.class, threadGroup.getSamplerController());
+        assertTrue(editorLoop.getPropertyAsBoolean("LoopController.continue_forever"));
     }
 }
