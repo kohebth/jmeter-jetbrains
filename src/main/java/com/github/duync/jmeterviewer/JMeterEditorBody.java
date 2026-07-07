@@ -15,6 +15,7 @@ final class JMeterEditorBody {
         treeAndDetails.setSecondComponent(details);
 
         JTabbedPane tabs = new JTabbedPane();
+        JMeterTabOverflowSupport.apply(tabs);
         tabs.addTab("Visual", treeAndDetails);
         tabs.addTab("JMX Source", sourcePanel.component());
         return tabs;

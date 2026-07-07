@@ -38,8 +38,8 @@ public final class JMeterResultsToolWindowFactory implements ToolWindowFactory {
         toolbar.add(button("Clear Samples", panel::clearResults));
         toolbar.add(button("Clear Log", panel::clearLog));
         wrapper.add(toolbar, BorderLayout.NORTH);
-        wrapper.add(component, BorderLayout.CENTER);
-        return wrapper;
+        wrapper.add(JMeterTabOverflowSupport.apply(component), BorderLayout.CENTER);
+        return JMeterTabOverflowSupport.apply(wrapper);
     }
 
     private JButton button(String label, Runnable action) {

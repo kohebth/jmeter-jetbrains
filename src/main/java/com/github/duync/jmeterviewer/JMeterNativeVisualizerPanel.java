@@ -31,6 +31,7 @@ final class JMeterNativeVisualizerPanel {
             if (instance instanceof JComponent) {
                 JComponent component = (JComponent) instance;
                 component.setName(label);
+                JMeterTabOverflowSupport.apply(component);
                 panel.add(component, BorderLayout.CENTER);
             } else {
                 error = new JTextArea(className + " is not a Swing component.");

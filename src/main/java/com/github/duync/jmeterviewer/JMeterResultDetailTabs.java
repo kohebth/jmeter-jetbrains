@@ -22,6 +22,7 @@ final class JMeterResultDetailTabs {
     private String renderedText = "";
 
     JMeterResultDetailTabs() {
+        JMeterTabOverflowSupport.apply(tabs);
         panel.add(toolbar(), BorderLayout.NORTH);
         tabs.addTab("Sampler Result", new JBScrollPane(sampler));
         tabs.addTab("Request", new JBScrollPane(request));
