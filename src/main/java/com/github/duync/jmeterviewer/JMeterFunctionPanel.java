@@ -1,5 +1,6 @@
 package com.github.duync.jmeterviewer;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.ui.components.JBScrollPane;
 import org.apache.jmeter.functions.Function;
@@ -19,8 +20,9 @@ final class JMeterFunctionPanel {
     }
 
     static JComponent create() {
-        java.util.List<Entry> entries = discover();
+        java.util.List<Entry> entries = new ArrayList<>();
         DefaultListModel<Entry> model = new DefaultListModel<>();
+        JLabel status = new JLabel("Loading functions...");
         refresh(model, entries, "");
         JList<Entry> list = new JList<>(model);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -36,11 +38,7 @@ final class JMeterFunctionPanel {
         onTextChange(arguments, () -> updatePreview(list, arguments, preview));
         copy.addActionListener(event -> copySelected(preview));
         insert.addActionListener(event -> insertSelected(preview));
-        refresh.addActionListener(event -> {
-            entries.clear();
-            entries.addAll(discover());
-            refresh(model, entries, filter.getText());
-        });
+        refresh.addActionListener(event -> discoverAsync(entries, model, filter, status));
         JPanel search = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         search.add(new JLabel("Find"));
         search.add(filter);
@@ -56,11 +54,29 @@ final class JMeterFunctionPanel {
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(editor, BorderLayout.CENTER);
         bottom.add(actions, BorderLayout.SOUTH);
+        bottom.add(status, BorderLayout.NORTH);
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(search, BorderLayout.NORTH);
         panel.add(new JBScrollPane(list), BorderLayout.CENTER);
         panel.add(bottom, BorderLayout.SOUTH);
+        discoverAsync(entries, model, filter, status);
         return panel;
+    }
+
+    private static void discoverAsync(java.util.List<Entry> entries,
+                                      DefaultListModel<Entry> model,
+                                      JTextField filter,
+                                      JLabel status) {
+        status.setText("Loading functions...");
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            java.util.List<Entry> discovered = discover();
+            SwingUtilities.invokeLater(() -> {
+                entries.clear();
+                entries.addAll(discovered);
+                refresh(model, entries, filter.getText());
+                status.setText(model.getSize() + " functions");
+            });
+        });
     }
 
     private static void refresh(DefaultListModel<Entry> model, java.util.List<Entry> entries, String filter) {

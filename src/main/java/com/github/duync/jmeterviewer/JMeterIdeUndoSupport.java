@@ -1,5 +1,6 @@
 package com.github.duync.jmeterviewer;
 
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.undo.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -29,7 +30,15 @@ final class JMeterIdeUndoSupport {
         if (next == null || next.sameAs(current) || manager.isUndoOrRedoInProgress()) {
             return;
         }
-        manager.undoableActionPerformed(new TreeEditAction(this, file, current, next));
+        TreeEditAction action = new TreeEditAction(this, file, current, next);
+        if (CommandProcessor.getInstance().getCurrentCommand() != null) {
+            manager.undoableActionPerformed(action);
+        } else {
+            CommandProcessor.getInstance().executeCommand(project,
+                    () -> manager.undoableActionPerformed(action),
+                    "Edit JMeter Test Plan",
+                    file);
+        }
         current = next;
     }
 
