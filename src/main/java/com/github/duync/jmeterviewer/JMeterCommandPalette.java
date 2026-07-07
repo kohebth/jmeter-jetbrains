@@ -19,10 +19,12 @@ final class JMeterCommandPalette {
     JMeterCommandPalette(Project project,
                          JMeterTreeActions actions,
                          JMeterTreeFileActions fileActions,
-                         JMeterAddElementDialog addDialog) {
+                         JMeterAddElementDialog addDialog,
+                         JMeterTemplateDialog templates) {
         this.project = project;
         commands = Arrays.asList(
                 new Command("Add element", addDialog::show),
+                new Command("Insert template", templates::show),
                 new Command("Delete selected", actions::deleteSelected),
                 new Command("Duplicate selected", actions::duplicateSelected),
                 new Command("Duplicate selected disabled", actions::duplicateSelectedDisabled),
@@ -31,6 +33,10 @@ final class JMeterCommandPalette {
                 new Command("Paste into selected", actions::pasteIntoSelected),
                 new Command("Import JMX into selected", fileActions::importJmx),
                 new Command("Export selected node", fileActions::exportSelected),
+                new Command("Export sampler and controller names", fileActions::exportNames),
+                new Command("Copy sampler and controller names", fileActions::copyNames),
+                new Command("Copy tree outline", fileActions::copyOutline),
+                new Command("Copy code outline", fileActions::copyCodeOutline),
                 new Command("Enable selected", actions::enableSelected),
                 new Command("Disable selected", actions::disableSelected),
                 new Command("Enable selected subtree", actions::enableSelectedTree),
@@ -38,6 +44,9 @@ final class JMeterCommandPalette {
                 new Command("Toggle enabled", actions::toggleSelectedEnabled),
                 new Command("Move selected up", actions::moveSelectedUp),
                 new Command("Move selected down", actions::moveSelectedDown),
+                new Command("Insert Simple Controller parent", actions::insertSimpleControllerParent),
+                new Command("Change parent to Simple Controller", actions::changeSelectedParentToSimpleController),
+                new Command("Add think times between steps", actions::addThinkTimes),
                 new Command("Expand selected", actions::expandSelected),
                 new Command("Collapse selected", actions::collapseSelected),
                 new Command("Expand all", actions::expandAll),

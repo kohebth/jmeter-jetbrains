@@ -1,6 +1,7 @@
 package com.github.duync.jmeterviewer;
 
 import com.intellij.openapi.fileChooser.*;
+import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWrapper;
@@ -8,7 +9,9 @@ import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
 import org.apache.jmeter.save.SaveService;
 
+import java.awt.datatransfer.StringSelection;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -53,6 +56,38 @@ final class JMeterTreeFileActions {
         if (target != null) {
             exportTo(node, target);
         }
+    }
+
+    void exportNames() {
+        JMeterTreeNode node = selectedOrRootChild();
+        VirtualFileWrapper target = FileChooserFactory.getInstance()
+                .createSaveFileDialog(new FileSaverDescriptor("Export JMeter Names",
+                        "Export sampler and controller names", "txt"), project)
+                .save("jmeter-names.txt");
+        if (target != null) {
+            writeText(target, JMeterTreeTextExporter.names(node), "Exported sampler and controller names");
+        }
+    }
+
+    void copyNames() {
+        CopyPasteManager.getInstance().setContents(new StringSelection(
+                JMeterTreeTextExporter.names(selectedOrRootChild())
+        ));
+        JMeterIdeNotifications.info(project, "Copied sampler and controller names");
+    }
+
+    void copyOutline() {
+        CopyPasteManager.getInstance().setContents(new StringSelection(
+                JMeterTreeTextExporter.outline(selectedOrRootChild())
+        ));
+        JMeterIdeNotifications.info(project, "Copied JMeter tree outline");
+    }
+
+    void copyCodeOutline() {
+        CopyPasteManager.getInstance().setContents(new StringSelection(
+                JMeterTreeTextExporter.codeOutline(selectedOrRootChild())
+        ));
+        JMeterIdeNotifications.info(project, "Copied JMeter code outline");
     }
 
     private void importFrom(VirtualFile file) {
@@ -105,6 +140,19 @@ final class JMeterTreeFileActions {
             JMeterIdeNotifications.info(project, "Exported " + node.getName());
         } catch (Exception exception) {
             JMeterIdeNotifications.error(project, "Unable to export JMX: " + exception.getMessage());
+        }
+    }
+
+    private void writeText(VirtualFileWrapper target, String text, String message) {
+        try {
+            java.nio.file.Files.write(target.getFile().toPath(), text.getBytes(StandardCharsets.UTF_8));
+            VirtualFile virtualFile = target.getVirtualFile(true);
+            if (virtualFile != null) {
+                virtualFile.refresh(false, false);
+            }
+            JMeterIdeNotifications.info(project, message);
+        } catch (Exception exception) {
+            JMeterIdeNotifications.error(project, "Unable to export text: " + exception.getMessage());
         }
     }
 

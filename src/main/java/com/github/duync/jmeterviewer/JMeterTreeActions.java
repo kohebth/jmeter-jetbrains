@@ -63,6 +63,24 @@ final class JMeterTreeActions {
         }
     }
 
+    void insertTemplate(JMeterTemplate template) {
+        JMeterTreeNode lastAdded = null;
+        for (JMeterTemplate.Node root : template.roots()) {
+            JMeterTreeNode parent = JMeterTemplateInsertion.parent(model, selectedNode(), root);
+            if (parent == null) {
+                continue;
+            }
+            JMeterTreeNode added = JMeterTreeOperations.addTemplate(model, parent, root);
+            if (added != null) {
+                lastAdded = added;
+            }
+        }
+        if (lastAdded != null) {
+            selectNode(lastAdded);
+            modified.run();
+        }
+    }
+
     void deleteSelected() {
         boolean changed = false;
         for (JMeterTreeNode node : selectedNodes()) {
@@ -171,6 +189,34 @@ final class JMeterTreeActions {
         JMeterTreeNode selected = selectedNode();
         if (JMeterTreeOperations.moveDown(model, selected)) {
             selectNode(selected);
+            modified.run();
+        }
+    }
+
+    void insertSimpleControllerParent() {
+        JMeterTreeNode wrapper = JMeterStructuralOperations.insertParent(model,
+                selectedNodesInDisplayOrder(),
+                JMeterPaletteItem.findByLabel("Simple Controller"));
+        if (wrapper != null) {
+            selectNode(wrapper);
+            modified.run();
+        }
+    }
+
+    void changeSelectedParentToSimpleController() {
+        JMeterTreeNode replacement = JMeterStructuralOperations.changeParent(model,
+                selectedNode(),
+                JMeterPaletteItem.findByLabel("Simple Controller"));
+        if (replacement != null) {
+            selectNode(replacement);
+            modified.run();
+        }
+    }
+
+    void addThinkTimes() {
+        JMeterTreeNode parent = selectedNode();
+        if (JMeterStructuralOperations.addThinkTimes(model, parent) > 0) {
+            selectNode(parent);
             modified.run();
         }
     }

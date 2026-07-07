@@ -32,6 +32,7 @@ final class JMeterEditorToolbar {
                              JMeterTreeActions actions,
                              JMeterTreeFileActions fileActions,
                              JMeterAddElementDialog addDialog,
+                             JMeterTemplateDialog templates,
                              JMeterCommandPalette commandPalette,
                              JMeterSearchController search) {
         JPanel toolbar = new JBPanel<>();
@@ -56,6 +57,7 @@ final class JMeterEditorToolbar {
         toolbar.add(statsButton);
         toolbar.add(runStatusLabel);
         toolbar.add(addDialog.button());
+        toolbar.add(templates.button());
         toolbar.add(commandPalette.button());
         toolbar.add(button("Delete", actions::deleteSelected));
         toolbar.add(button("Duplicate", actions::duplicateSelected));
@@ -65,11 +67,15 @@ final class JMeterEditorToolbar {
         toolbar.add(button("Paste", actions::pasteIntoSelected));
         toolbar.add(button("Import JMX", fileActions::importJmx));
         toolbar.add(button("Export Node", fileActions::exportSelected));
+        toolbar.add(button("Export Names", fileActions::exportNames));
+        toolbar.add(button("Copy Outline", fileActions::copyOutline));
         toolbar.add(button("Enable/Disable", actions::toggleSelectedEnabled));
         toolbar.add(button("Enable", actions::enableSelected));
         toolbar.add(button("Disable", actions::disableSelected));
         toolbar.add(button("Up", actions::moveSelectedUp));
         toolbar.add(button("Down", actions::moveSelectedDown));
+        toolbar.add(button("Wrap", actions::insertSimpleControllerParent));
+        toolbar.add(button("Think Times", actions::addThinkTimes));
         toolbar.add(button("Expand", actions::expandSelected));
         toolbar.add(button("Collapse", actions::collapseSelected));
         toolbar.add(new JLabel("Find"));

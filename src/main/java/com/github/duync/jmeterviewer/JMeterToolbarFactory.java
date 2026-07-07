@@ -16,6 +16,7 @@ final class JMeterToolbarFactory {
                              JMeterTreeActions treeActions,
                              JMeterTreeFileActions fileActions,
                              JMeterAddElementDialog addDialog,
+                             JMeterTemplateDialog templates,
                              JMeterCommandPalette commands,
                              JMeterSearchController search) {
         return JMeterEditorToolbar.create(
@@ -40,6 +41,7 @@ final class JMeterToolbarFactory {
                 treeActions,
                 fileActions,
                 addDialog,
+                templates,
                 commands,
                 search
         );

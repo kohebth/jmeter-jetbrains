@@ -56,6 +56,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
     private JMeterTreeModel model;
     private JTree tree;
     private JMeterCommandPalette commandPalette;
+    private JMeterTemplateDialog templateDialog;
     private boolean modified;
     private boolean updatingCurrentNode;
 
@@ -141,7 +142,8 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         JMeterTreeFileActions fileActions = new JMeterTreeFileActions(project, model,
                 treeActions::selectedNode, treeActions::selectNode, this::markTreeModified);
         JMeterAddElementDialog addDialog = new JMeterAddElementDialog(project, treeActions);
-        commandPalette = new JMeterCommandPalette(project, treeActions, fileActions, addDialog);
+        templateDialog = new JMeterTemplateDialog(project, treeActions);
+        commandPalette = new JMeterCommandPalette(project, treeActions, fileActions, addDialog, templateDialog);
         JMeterSearchController search = new JMeterSearchController(
                 () -> model,
                 () -> tree,
@@ -150,7 +152,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
 
         component.removeAll();
         component.add(JMeterToolbarFactory.create(project, () -> model, toolbarState,
-                treeActions, fileActions, addDialog, commandPalette, search), BorderLayout.NORTH);
+                treeActions, fileActions, addDialog, templateDialog, commandPalette, search), BorderLayout.NORTH);
         sourcePanel.refresh();
         component.add(JMeterEditorBody.create(project, tree, elementPanel.component(), sourcePanel), BorderLayout.CENTER);
     }

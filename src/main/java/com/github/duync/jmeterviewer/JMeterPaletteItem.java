@@ -23,6 +23,20 @@ final class JMeterPaletteItem {
             new JMeterPaletteItem("JSR223 Sampler", Kind.SAMPLER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.java.sampler.JSR223Sampler"),
             new JMeterPaletteItem("Debug Sampler", Kind.SAMPLER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.sampler.DebugSampler"),
             new JMeterPaletteItem("Flow Control Action", Kind.SAMPLER, "org.apache.jmeter.sampler.gui.TestActionGui", "org.apache.jmeter.sampler.TestAction"),
+            new JMeterPaletteItem("FTP Request", Kind.SAMPLER, "org.apache.jmeter.protocol.ftp.control.gui.FtpTestSamplerGui", "org.apache.jmeter.protocol.ftp.sampler.FTPSampler"),
+            new JMeterPaletteItem("JDBC Request", Kind.SAMPLER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.jdbc.sampler.JDBCSampler"),
+            new JMeterPaletteItem("JMS Point-to-Point", Kind.SAMPLER, "org.apache.jmeter.protocol.jms.control.gui.JMSSamplerGui", "org.apache.jmeter.protocol.jms.sampler.JMSSampler"),
+            new JMeterPaletteItem("JMS Publisher", Kind.SAMPLER, "org.apache.jmeter.protocol.jms.control.gui.JMSPublisherGui", "org.apache.jmeter.protocol.jms.sampler.PublisherSampler"),
+            new JMeterPaletteItem("JMS Subscriber", Kind.SAMPLER, "org.apache.jmeter.protocol.jms.control.gui.JMSSubscriberGui", "org.apache.jmeter.protocol.jms.sampler.SubscriberSampler"),
+            new JMeterPaletteItem("JUnit Request", Kind.SAMPLER, "org.apache.jmeter.protocol.java.control.gui.JUnitTestSamplerGui", "org.apache.jmeter.protocol.java.sampler.JUnitSampler"),
+            new JMeterPaletteItem("LDAP Request", Kind.SAMPLER, "org.apache.jmeter.protocol.ldap.control.gui.LdapTestSamplerGui", "org.apache.jmeter.protocol.ldap.sampler.LDAPSampler"),
+            new JMeterPaletteItem("LDAP Extended Request", Kind.SAMPLER, "org.apache.jmeter.protocol.ldap.control.gui.LdapExtTestSamplerGui", "org.apache.jmeter.protocol.ldap.sampler.LDAPExtSampler"),
+            new JMeterPaletteItem("Mail Reader Sampler", Kind.SAMPLER, "org.apache.jmeter.protocol.mail.sampler.gui.MailReaderSamplerGui", "org.apache.jmeter.protocol.mail.sampler.MailReaderSampler"),
+            new JMeterPaletteItem("SMTP Sampler", Kind.SAMPLER, "org.apache.jmeter.protocol.smtp.sampler.gui.SmtpSamplerGui", "org.apache.jmeter.protocol.smtp.sampler.SmtpSampler"),
+            new JMeterPaletteItem("OS Process Sampler", Kind.SAMPLER, "org.apache.jmeter.protocol.system.gui.SystemSamplerGui", "org.apache.jmeter.protocol.system.SystemSampler"),
+            new JMeterPaletteItem("TCP Sampler", Kind.SAMPLER, "org.apache.jmeter.protocol.tcp.control.gui.TCPSamplerGui", "org.apache.jmeter.protocol.tcp.sampler.TCPSampler"),
+            new JMeterPaletteItem("Bolt Request", Kind.SAMPLER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.bolt.sampler.BoltSampler"),
+            new JMeterPaletteItem("MongoDB Script", Kind.SAMPLER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.mongodb.sampler.MongoScriptSampler"),
 
             new JMeterPaletteItem("Loop Controller", Kind.CONTROLLER, "org.apache.jmeter.control.gui.LoopControlPanel", "org.apache.jmeter.control.LoopController"),
             new JMeterPaletteItem("If Controller", Kind.CONTROLLER, "org.apache.jmeter.control.gui.IfControllerPanel", "org.apache.jmeter.control.IfController"),
@@ -51,6 +65,13 @@ final class JMeterPaletteItem {
             new JMeterPaletteItem("HTTP Authorization Manager", Kind.CONFIG, "org.apache.jmeter.protocol.http.gui.AuthPanel", "org.apache.jmeter.protocol.http.control.AuthManager"),
             new JMeterPaletteItem("DNS Cache Manager", Kind.CONFIG, "org.apache.jmeter.protocol.http.gui.DNSCachePanel", "org.apache.jmeter.protocol.http.control.DNSCacheManager"),
             new JMeterPaletteItem("Java Request Defaults", Kind.CONFIG, "org.apache.jmeter.protocol.java.config.gui.JavaConfigGui", "org.apache.jmeter.protocol.java.config.JavaConfig"),
+            new JMeterPaletteItem("FTP Request Defaults", Kind.CONFIG, "org.apache.jmeter.protocol.ftp.config.gui.FtpConfigGui", "org.apache.jmeter.config.ConfigTestElement"),
+            new JMeterPaletteItem("JDBC Connection Configuration", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.jdbc.config.DataSourceElement"),
+            new JMeterPaletteItem("LDAP Request Defaults", Kind.CONFIG, "org.apache.jmeter.protocol.ldap.config.gui.LdapConfigGui", "org.apache.jmeter.config.ConfigTestElement"),
+            new JMeterPaletteItem("LDAP Extended Request Defaults", Kind.CONFIG, "org.apache.jmeter.protocol.ldap.config.gui.LdapExtConfigGui", "org.apache.jmeter.config.ConfigTestElement"),
+            new JMeterPaletteItem("TCP Sampler Config", Kind.CONFIG, "org.apache.jmeter.protocol.tcp.config.gui.TCPConfigGui", "org.apache.jmeter.config.ConfigTestElement"),
+            new JMeterPaletteItem("Bolt Connection Configuration", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.bolt.config.BoltConnectionElement"),
+            new JMeterPaletteItem("MongoDB Source Config", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.protocol.mongodb.config.MongoSourceElement"),
             new JMeterPaletteItem("CSV Data Set Config", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.config.CSVDataSet"),
             new JMeterPaletteItem("Random Variable", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.config.RandomVariableConfig"),
             new JMeterPaletteItem("Keystore Configuration", Kind.CONFIG, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.config.KeystoreConfig"),
@@ -119,7 +140,10 @@ final class JMeterPaletteItem {
             new JMeterPaletteItem("BeanShell Listener", Kind.LISTENER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.visualizers.BeanShellListener"),
             new JMeterPaletteItem("BSF Listener", Kind.LISTENER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.visualizers.BSFListener"),
             new JMeterPaletteItem("JSR223 Listener", Kind.LISTENER, "org.apache.jmeter.testbeans.gui.TestBeanGUI", "org.apache.jmeter.visualizers.JSR223Listener"),
-            new JMeterPaletteItem("Backend Listener", Kind.LISTENER, "org.apache.jmeter.visualizers.backend.BackendListenerGui", "org.apache.jmeter.visualizers.backend.BackendListener")
+            new JMeterPaletteItem("Backend Listener", Kind.LISTENER, "org.apache.jmeter.visualizers.backend.BackendListenerGui", "org.apache.jmeter.visualizers.backend.BackendListener"),
+
+            new JMeterPaletteItem("WorkBench", Kind.NON_TEST, "org.apache.jmeter.control.gui.WorkBenchGui", "org.apache.jmeter.testelement.WorkBench"),
+            new JMeterPaletteItem("HTTP(S) Test Script Recorder", Kind.NON_TEST, "org.apache.jmeter.protocol.http.proxy.gui.ProxyControlGui", "org.apache.jmeter.protocol.http.proxy.ProxyControl")
     );
 
     private final String label;
@@ -139,6 +163,10 @@ final class JMeterPaletteItem {
             return guiClassName + "|" + testClassName;
         }
         return guiClassName;
+    }
+
+    String label() {
+        return label;
     }
 
     TestElement createTestElement() throws ReflectiveOperationException {
@@ -167,6 +195,24 @@ final class JMeterPaletteItem {
     static JMeterPaletteItem findByKey(String key) {
         for (JMeterPaletteItem item : JMeterPaletteCatalog.items()) {
             if (item.matchesKey(key)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    static JMeterPaletteItem findByLabel(String label) {
+        for (JMeterPaletteItem item : JMeterPaletteCatalog.items()) {
+            if (item.label.equals(label)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    static JMeterPaletteItem findByTestClass(String className) {
+        for (JMeterPaletteItem item : JMeterPaletteCatalog.items()) {
+            if (item.testClassName != null && item.testClassName.equals(className)) {
                 return item;
             }
         }

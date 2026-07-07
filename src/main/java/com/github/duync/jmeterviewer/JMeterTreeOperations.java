@@ -31,6 +31,21 @@ final class JMeterTreeOperations {
         return child;
     }
 
+    static JMeterTreeNode addTemplate(JMeterTreeModel model, JMeterTreeNode parent, JMeterTemplate.Node template) {
+        JMeterPaletteItem item = JMeterPaletteItem.findByLabel(template.element());
+        if (item == null) {
+            return null;
+        }
+        JMeterTreeNode node = add(model, parent, item);
+        if (node == null) {
+            return null;
+        }
+        for (JMeterTemplate.Node child : template.children()) {
+            addTemplate(model, node, child);
+        }
+        return node;
+    }
+
     static boolean remove(JMeterTreeModel model, JMeterTreeNode node) {
         if (!canRemove(node)) {
             return false;
