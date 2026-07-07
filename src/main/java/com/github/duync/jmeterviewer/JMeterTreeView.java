@@ -46,8 +46,16 @@ final class JMeterTreeView {
         bind(tree, KeyEvent.VK_UP, InputEvent.ALT_DOWN_MASK, "jmeter.moveUp", actions::moveSelectedUp);
         bind(tree, KeyEvent.VK_DOWN, InputEvent.ALT_DOWN_MASK, "jmeter.moveDown", actions::moveSelectedDown);
         bind(tree, KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK, "jmeter.toggleEnabled", actions::toggleSelectedEnabled);
+        bind(tree, KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                "jmeter.enableSubtree", actions::enableSelectedTree);
+        bind(tree, KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                "jmeter.disableSubtree", actions::disableSelectedTree);
         bind(tree, KeyEvent.VK_RIGHT, InputEvent.SHIFT_DOWN_MASK, "jmeter.expandSelected", actions::expandSelected);
         bind(tree, KeyEvent.VK_LEFT, InputEvent.SHIFT_DOWN_MASK, "jmeter.collapseSelected", actions::collapseSelected);
+        bind(tree, KeyEvent.VK_RIGHT, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                "jmeter.expandAll", actions::expandAll);
+        bind(tree, KeyEvent.VK_LEFT, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                "jmeter.collapseAll", actions::collapseAll);
     }
 
     private static void bind(JTree tree, int keyCode, int modifiers, String name, Runnable runnable) {
@@ -109,6 +117,10 @@ final class JMeterTreeView {
             popup.addSeparator();
             popup.add(menuItem("Move Up", actions::moveSelectedUp));
             popup.add(menuItem("Move Down", actions::moveSelectedDown));
+            popup.addSeparator();
+            popup.add(menuItem("Wrap in Simple Controller", actions::insertSimpleControllerParent));
+            popup.add(menuItem("Change Parent to Simple Controller", actions::changeSelectedParentToSimpleController));
+            popup.add(menuItem("Add Think Times", actions::addThinkTimes));
             popup.addSeparator();
             popup.add(menuItem("Expand", actions::expandSelected));
             popup.add(menuItem("Collapse", actions::collapseSelected));

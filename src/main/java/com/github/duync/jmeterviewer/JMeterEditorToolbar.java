@@ -80,13 +80,18 @@ final class JMeterEditorToolbar {
         toolbar.add(button("Import JMX", fileActions::importJmx));
         toolbar.add(button("Export Node", fileActions::exportSelected));
         toolbar.add(button("Export Names", fileActions::exportNames));
+        toolbar.add(button("Copy Names", fileActions::copyNames));
         toolbar.add(button("Copy Outline", fileActions::copyOutline));
+        toolbar.add(button("Copy Code", fileActions::copyCodeOutline));
         toolbar.add(button("Enable/Disable", actions::toggleSelectedEnabled));
         toolbar.add(button("Enable", actions::enableSelected));
         toolbar.add(button("Disable", actions::disableSelected));
+        toolbar.add(button("Enable Tree", actions::enableSelectedTree));
+        toolbar.add(button("Disable Tree", actions::disableSelectedTree));
         toolbar.add(button("Up", actions::moveSelectedUp));
         toolbar.add(button("Down", actions::moveSelectedDown));
         toolbar.add(button("Wrap", actions::insertSimpleControllerParent));
+        toolbar.add(button("Parent Ctrl", actions::changeSelectedParentToSimpleController));
         toolbar.add(button("Think Times", actions::addThinkTimes));
         toolbar.add(button("Expand", actions::expandSelected));
         toolbar.add(button("Collapse", actions::collapseSelected));
