@@ -12,7 +12,7 @@ final class JMeterLeftPanel {
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Elements", JMeterPalettePanel.create());
         tabs.addTab("Functions", JMeterFunctionPanel.create());
-        tabs.addTab("Properties", JMeterPropertiesPanel.create());
+        tabs.addTab("Properties", JMeterPropertiesPanel.create(project));
         tabs.addTab("Plugins", JMeterPluginPanel.create(project));
         return tabs;
     }
