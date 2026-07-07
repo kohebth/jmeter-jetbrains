@@ -8,6 +8,7 @@ import org.apache.jorphan.collections.HashTree;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,5 +42,22 @@ final class JMeterRunTreePreparerTest {
 
         assertTrue(threadGroup.getScheduler());
         assertEquals(1, threadGroup.getDuration());
+    }
+
+    @Test
+    void finiteLoopCountDisablesContinueForeverBeforeRun() {
+        ThreadGroup threadGroup = new ThreadGroup();
+        LoopController loopController = new LoopController();
+        loopController.setLoops(2);
+        loopController.setContinueForever(true);
+        threadGroup.setSamplerController(loopController);
+        HashTree tree = new HashTree();
+        tree.add(threadGroup);
+
+        JMeterRunTreePreparer.prepare(tree);
+
+        LoopController prepared = assertInstanceOf(LoopController.class, threadGroup.getSamplerController());
+        assertEquals(2, prepared.getLoops());
+        assertFalse(prepared.getPropertyAsBoolean("LoopController.continue_forever"));
     }
 }
