@@ -144,12 +144,14 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
                 treeActions::selectedNode, treeActions::selectNode, this::markTreeModified);
         JMeterAddElementDialog addDialog = new JMeterAddElementDialog(project, treeActions);
         templateDialog = new JMeterTemplateDialog(project, treeActions);
-        commandPalette = new JMeterCommandPalette(project, treeActions, fileActions, addDialog, templateDialog);
         JMeterSearchController search = new JMeterSearchController(
+                project,
                 () -> model,
                 () -> tree,
-                treeActions::selectNode
+                treeActions::selectNode,
+                this::markTreeModified
         );
+        commandPalette = new JMeterCommandPalette(project, treeActions, fileActions, addDialog, templateDialog, search);
 
         component.removeAll();
         component.add(JMeterToolbarFactory.create(project, () -> model, toolbarState,

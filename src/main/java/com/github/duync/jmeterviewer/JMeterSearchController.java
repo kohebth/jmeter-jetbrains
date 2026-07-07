@@ -1,8 +1,11 @@
 package com.github.duync.jmeterviewer;
 
+import com.intellij.openapi.project.Project;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
 import org.apache.jmeter.testelement.TestElement;
+import org.apache.jmeter.testelement.property.JMeterProperty;
+import org.apache.jmeter.testelement.property.PropertyIterator;
 
 import javax.swing.JLabel;
 import javax.swing.JTextField;
@@ -16,17 +19,23 @@ final class JMeterSearchController {
     private final Supplier<JMeterTreeModel> modelSupplier;
     private final Supplier<JTree> treeSupplier;
     private final Consumer<JMeterTreeNode> nodeSelector;
+    private final Project project;
+    private final Runnable modified;
     private final JTextField searchField;
     private final JLabel statusLabel;
     private final List<JMeterTreeNode> matches;
     private int searchIndex = -1;
 
-    JMeterSearchController(Supplier<JMeterTreeModel> modelSupplier,
+    JMeterSearchController(Project project,
+                           Supplier<JMeterTreeModel> modelSupplier,
                            Supplier<JTree> treeSupplier,
-                           Consumer<JMeterTreeNode> nodeSelector) {
+                           Consumer<JMeterTreeNode> nodeSelector,
+                           Runnable modified) {
+        this.project = project;
         this.modelSupplier = modelSupplier;
         this.treeSupplier = treeSupplier;
         this.nodeSelector = nodeSelector;
+        this.modified = modified;
         this.searchField = new JTextField(18);
         this.statusLabel = new JLabel("");
         this.matches = new ArrayList<>();
@@ -55,6 +64,10 @@ final class JMeterSearchController {
             nodeSelector.accept(matches.get(searchIndex));
             updateStatus();
         }
+    }
+
+    void showDialog() {
+        new JMeterSearchDialog(project, modelSupplier, nodeSelector, modified).show();
     }
 
     private boolean refreshMatches() {
@@ -95,10 +108,20 @@ final class JMeterSearchController {
 
     private boolean matches(JMeterTreeNode node, String query) {
         TestElement element = node.getTestElement();
-        return contains(node.getName(), query)
+        if (contains(node.getName(), query)
                 || contains(element.getPropertyAsString(TestElement.GUI_CLASS), query)
                 || contains(element.getPropertyAsString(TestElement.TEST_CLASS), query)
-                || contains(element.getComment(), query);
+                || contains(element.getComment(), query)) {
+            return true;
+        }
+        PropertyIterator properties = element.propertyIterator();
+        while (properties.hasNext()) {
+            JMeterProperty property = properties.next();
+            if (contains(property.getName(), query) || contains(property.getStringValue(), query)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean contains(String value, String query) {

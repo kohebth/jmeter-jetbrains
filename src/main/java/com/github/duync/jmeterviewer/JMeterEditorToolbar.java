@@ -88,6 +88,7 @@ final class JMeterEditorToolbar {
         toolbar.add(search.field());
         toolbar.add(button("Next", search::findNext));
         toolbar.add(button("Prev", search::findPrevious));
+        toolbar.add(button("Search Plan", search::showDialog));
         toolbar.add(search.statusLabel());
         return toolbar;
     }

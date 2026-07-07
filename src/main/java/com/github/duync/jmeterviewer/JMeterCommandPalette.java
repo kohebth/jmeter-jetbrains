@@ -20,7 +20,8 @@ final class JMeterCommandPalette {
                          JMeterTreeActions actions,
                          JMeterTreeFileActions fileActions,
                          JMeterAddElementDialog addDialog,
-                         JMeterTemplateDialog templates) {
+                         JMeterTemplateDialog templates,
+                         JMeterSearchController search) {
         this.project = project;
         commands = Arrays.asList(
                 new Command("Add element", addDialog::show),
@@ -37,6 +38,7 @@ final class JMeterCommandPalette {
                 new Command("Copy sampler and controller names", fileActions::copyNames),
                 new Command("Copy tree outline", fileActions::copyOutline),
                 new Command("Copy code outline", fileActions::copyCodeOutline),
+                new Command("Search and replace", search::showDialog),
                 new Command("Enable selected", actions::enableSelected),
                 new Command("Disable selected", actions::disableSelected),
                 new Command("Enable selected subtree", actions::enableSelectedTree),
