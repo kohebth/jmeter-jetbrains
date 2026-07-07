@@ -91,7 +91,8 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         this.runOptions = new JMeterRunOptions(project);
         this.runController = new JMeterRunController(new JMeterEditorRunListener(this::setRunStatus, resultsPanel));
         this.threadControl = new JMeterThreadControlPanel(runController);
-        this.sourcePanel = new JMeterSourcePanel(project, file, this::load, this);
+        this.sourcePanel = new JMeterSourcePanel(project, file, this::load,
+                this::updateCurrentJMeterNode, () -> model, this);
         this.undoSupport = new JMeterIdeUndoSupport(project, file, this::restoreModel);
         this.toolbarState = new JMeterEditorToolbarState(saveButton, reloadButton, runButton, runLocalButton,
                 runRemoteButton, runAllButton, stopButton,
@@ -207,6 +208,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
     private void save(boolean notifySuccess) {
         updateCurrentJMeterNode();
         if (JMeterFileSaver.save(project, file, model, elementPanel, notifySuccess)) {
+            sourcePanel.refresh();
             setModified(false);
         }
     }

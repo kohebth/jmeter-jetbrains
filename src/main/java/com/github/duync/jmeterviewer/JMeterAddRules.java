@@ -20,7 +20,10 @@ final class JMeterAddRules {
     }
 
     static boolean canAdd(JMeterTreeNode parent, JMeterPaletteItem item) {
-        return createAddableElement(parent, item) != null;
+        if (parent == null || item == null) {
+            return false;
+        }
+        return canAddKind(parent.getTestElement(), item.kind());
     }
 
     static TestElement createAddableElement(JMeterTreeNode parent, JMeterPaletteItem item) {
@@ -60,6 +63,44 @@ final class JMeterAddRules {
 
     private static boolean isWorkBench(TestElement element) {
         return "org.apache.jmeter.testelement.WorkBench".equals(element.getClass().getName());
+    }
+
+    private static boolean canAddKind(TestElement parentElement, JMeterPaletteItem.Kind kind) {
+        if (parentElement instanceof TestPlan) {
+            return kind == JMeterPaletteItem.Kind.THREAD_GROUP
+                    || kind == JMeterPaletteItem.Kind.TEST_FRAGMENT
+                    || kind == JMeterPaletteItem.Kind.CONFIG
+                    || kind == JMeterPaletteItem.Kind.LISTENER;
+        }
+        if (isWorkBench(parentElement)) {
+            return true;
+        }
+        if (parentElement instanceof AbstractThreadGroup || parentElement instanceof Controller) {
+            return isThreadChildKind(kind);
+        }
+        if (parentElement instanceof Sampler) {
+            return isSamplerChildKind(kind);
+        }
+        return false;
+    }
+
+    private static boolean isThreadChildKind(JMeterPaletteItem.Kind kind) {
+        return kind == JMeterPaletteItem.Kind.SAMPLER
+                || kind == JMeterPaletteItem.Kind.CONTROLLER
+                || kind == JMeterPaletteItem.Kind.CONFIG
+                || kind == JMeterPaletteItem.Kind.ASSERTION
+                || kind == JMeterPaletteItem.Kind.TIMER
+                || kind == JMeterPaletteItem.Kind.PRE_PROCESSOR
+                || kind == JMeterPaletteItem.Kind.POST_PROCESSOR
+                || kind == JMeterPaletteItem.Kind.LISTENER;
+    }
+
+    private static boolean isSamplerChildKind(JMeterPaletteItem.Kind kind) {
+        return kind == JMeterPaletteItem.Kind.ASSERTION
+                || kind == JMeterPaletteItem.Kind.TIMER
+                || kind == JMeterPaletteItem.Kind.PRE_PROCESSOR
+                || kind == JMeterPaletteItem.Kind.POST_PROCESSOR
+                || kind == JMeterPaletteItem.Kind.LISTENER;
     }
 
     private static boolean isThreadChild(TestElement element) {
