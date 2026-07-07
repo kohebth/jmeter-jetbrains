@@ -19,8 +19,12 @@ public final class JMeterResultsToolWindowFactory implements ToolWindowFactory {
         toolWindow.getContentManager().addContent(content(project, panel, "Run", panel.monitorComponent()));
         toolWindow.getContentManager().addContent(content(project, panel, "Table", panel.tableComponent()));
         toolWindow.getContentManager().addContent(content(project, panel,
+                JMeterResultsWorkspace.VIEW_RESULTS_TABLE_CONTENT, panel.nativeTableComponent()));
+        toolWindow.getContentManager().addContent(content(project, panel,
                 JMeterResultsWorkspace.VIEW_RESULTS_TREE_CONTENT, panel.treeComponent()));
         toolWindow.getContentManager().addContent(content(project, panel, "Summary", panel.summaryComponent()));
+        toolWindow.getContentManager().addContent(content(project, panel,
+                JMeterResultsWorkspace.SUMMARY_REPORT_CONTENT, panel.nativeSummaryComponent()));
         toolWindow.getContentManager().addContent(content(project, panel, "Log", panel.logComponent()));
     }
 

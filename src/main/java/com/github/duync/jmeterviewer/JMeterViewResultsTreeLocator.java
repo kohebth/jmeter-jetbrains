@@ -12,27 +12,40 @@ final class JMeterViewResultsTreeLocator {
     }
 
     static TestElement find(JMeterTreeModel model) {
+        return find(model, SHORT_GUI_CLASS, FULL_GUI_CLASS);
+    }
+
+    static TestElement find(JMeterTreeModel model, String... guiClasses) {
         if (model == null || !(model.getRoot() instanceof JMeterTreeNode)) {
             return null;
         }
-        return find((JMeterTreeNode) model.getRoot());
+        return find((JMeterTreeNode) model.getRoot(), guiClasses);
     }
 
     static boolean isViewResultsTree(TestElement element) {
+        return hasGuiClass(element, SHORT_GUI_CLASS, FULL_GUI_CLASS);
+    }
+
+    static boolean hasGuiClass(TestElement element, String... guiClasses) {
         if (element == null) {
             return false;
         }
         String guiClass = element.getPropertyAsString(TestElement.GUI_CLASS);
-        return SHORT_GUI_CLASS.equals(guiClass) || FULL_GUI_CLASS.equals(guiClass);
+        for (String candidate : guiClasses) {
+            if (candidate.equals(guiClass)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static TestElement find(JMeterTreeNode node) {
+    private static TestElement find(JMeterTreeNode node, String... guiClasses) {
         TestElement element = node.getTestElement();
-        if (isViewResultsTree(element)) {
+        if (hasGuiClass(element, guiClasses)) {
             return element;
         }
         for (int i = 0; i < node.getChildCount(); i++) {
-            TestElement found = find((JMeterTreeNode) node.getChildAt(i));
+            TestElement found = find((JMeterTreeNode) node.getChildAt(i), guiClasses);
             if (found != null) {
                 return found;
             }

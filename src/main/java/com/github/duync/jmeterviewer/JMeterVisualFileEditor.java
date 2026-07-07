@@ -224,6 +224,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         }
         updateCurrentJMeterNode();
         resultsPanel.configureViewResultsTree(JMeterViewResultsTreeLocator.find(model));
+        configureNativeResultViews();
         resultsPanel.clear();
         resultsPanel.appendDiagnostic("Starting test");
         resultsPanel.runStarted();
@@ -238,7 +239,30 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         if (JMeterViewResultsTreeLocator.isViewResultsTree(selected)) {
             resultsPanel.configureViewResultsTree(selected);
             resultsWorkspace.showViewResultsTree();
+        } else if (isNativeTable(selected)) {
+            resultsPanel.configureNativeTable(selected);
+            resultsWorkspace.showViewResultsTable();
+        } else if (isNativeSummary(selected)) {
+            resultsPanel.configureNativeSummary(selected);
+            resultsWorkspace.showSummaryReport();
         }
+    }
+
+    private void configureNativeResultViews() {
+        resultsPanel.configureNativeTable(JMeterViewResultsTreeLocator.find(model,
+                "TableVisualizer", "org.apache.jmeter.visualizers.TableVisualizer"));
+        resultsPanel.configureNativeSummary(JMeterViewResultsTreeLocator.find(model,
+                "SummaryReport", "org.apache.jmeter.visualizers.SummaryReport"));
+    }
+
+    private boolean isNativeTable(TestElement element) {
+        return JMeterViewResultsTreeLocator.hasGuiClass(element,
+                "TableVisualizer", "org.apache.jmeter.visualizers.TableVisualizer");
+    }
+
+    private boolean isNativeSummary(TestElement element) {
+        return JMeterViewResultsTreeLocator.hasGuiClass(element,
+                "SummaryReport", "org.apache.jmeter.visualizers.SummaryReport");
     }
 
     private TestElement selectedElement() {

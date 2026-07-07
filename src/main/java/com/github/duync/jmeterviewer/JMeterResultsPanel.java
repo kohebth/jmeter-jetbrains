@@ -25,6 +25,8 @@ final class JMeterResultsPanel {
     private final JMeterResultDetailTabs tableDetails;
     private final JMeterResultDetailTabs treeDetails;
     private final JMeterNativeViewResultsTreePanel nativeViewResultsTree;
+    private final JMeterNativeVisualizerPanel nativeTable;
+    private final JMeterNativeVisualizerPanel nativeSummary;
     private final JMeterRunMonitorPanel runMonitor;
     private final JTextArea diagnosticLog;
 
@@ -48,6 +50,10 @@ final class JMeterResultsPanel {
         tableDetails = new JMeterResultDetailTabs();
         treeDetails = new JMeterResultDetailTabs();
         nativeViewResultsTree = new JMeterNativeViewResultsTreePanel();
+        nativeTable = new JMeterNativeVisualizerPanel("View Results in Table",
+                "org.apache.jmeter.visualizers.TableVisualizer");
+        nativeSummary = new JMeterNativeVisualizerPanel("Summary Report",
+                "org.apache.jmeter.visualizers.SummaryReport");
         runMonitor = new JMeterRunMonitorPanel();
         diagnosticLog = new JTextArea(8, 80);
         diagnosticLog.setEditable(false);
@@ -61,6 +67,10 @@ final class JMeterResultsPanel {
         return withDetails(new JBScrollPane(sampleResultTable), tableDetails.component());
     }
 
+    JComponent nativeTableComponent() {
+        return nativeTable.component();
+    }
+
     JComponent treeComponent() {
         return nativeViewResultsTree.component();
     }
@@ -69,12 +79,24 @@ final class JMeterResultsPanel {
         return new JBScrollPane(aggregateStatsTable);
     }
 
+    JComponent nativeSummaryComponent() {
+        return nativeSummary.component();
+    }
+
     JComponent logComponent() {
         return new JBScrollPane(diagnosticLog);
     }
 
     void configureViewResultsTree(TestElement element) {
         nativeViewResultsTree.configure(element);
+    }
+
+    void configureNativeTable(TestElement element) {
+        nativeTable.configure(element);
+    }
+
+    void configureNativeSummary(TestElement element) {
+        nativeSummary.configure(element);
     }
 
     void clear() {
@@ -91,6 +113,8 @@ final class JMeterResultsPanel {
         tableDetails.clear();
         treeDetails.clear();
         nativeViewResultsTree.clear();
+        nativeTable.clear();
+        nativeSummary.clear();
     }
 
     void clearLog() {
@@ -106,6 +130,8 @@ final class JMeterResultsPanel {
         sampleResultTable.getSelectionModel().setSelectionInterval(viewRow, viewRow);
         sampleResultTable.scrollRectToVisible(sampleResultTable.getCellRect(viewRow, 0, true));
         nativeViewResultsTree.add(result);
+        nativeTable.add(result);
+        nativeSummary.add(result);
         appendTreeNode(result);
     }
 
