@@ -11,6 +11,7 @@ import java.util.*;
 final class JMeterPluginClasspath {
     private static final LinkedHashSet<File> PATHS = new LinkedHashSet<>();
     private static volatile URLClassLoader loader;
+    private static volatile File jmeterHome;
 
     private JMeterPluginClasspath() {
     }
@@ -51,6 +52,7 @@ final class JMeterPluginClasspath {
 
     static synchronized void clear() {
         PATHS.clear();
+        jmeterHome = null;
         resetRuntimeViews();
     }
 
@@ -90,6 +92,7 @@ final class JMeterPluginClasspath {
         if (classLoader != null) {
             Thread.currentThread().setContextClassLoader(classLoader);
         }
+        activateJMeterHome();
     }
 
     private static void add(File file) {
@@ -97,13 +100,12 @@ final class JMeterPluginClasspath {
             return;
         }
         PATHS.add(normalize(file));
-        if (file.isDirectory()) {
-            File[] jars = file.listFiles(child -> child.getName().endsWith(".jar"));
-            if (jars != null) {
-                for (File jar : jars) {
-                    PATHS.add(normalize(jar));
-                }
-            }
+        File home = jmeterHome(file);
+        if (home != null) {
+            jmeterHome = home;
+            addJMeterHome(home);
+        } else if (file.isDirectory()) {
+            addJars(file);
         }
     }
 
@@ -118,6 +120,7 @@ final class JMeterPluginClasspath {
         if (properties == null) {
             return;
         }
+        activateJMeterHome();
         LinkedHashSet<String> values = new LinkedHashSet<>();
         values.addAll(Arrays.asList(JMeterUtils.getSearchPaths()));
         values.addAll(Arrays.asList(searchPaths()));
@@ -125,6 +128,60 @@ final class JMeterPluginClasspath {
         if (!values.isEmpty()) {
             properties.setProperty("search_paths", String.join(File.pathSeparator, values));
         }
+    }
+
+    private static void activateJMeterHome() {
+        File home = jmeterHome;
+        if (home == null || !home.isDirectory()) {
+            return;
+        }
+        JMeterUtils.setJMeterHome(home.getAbsolutePath());
+        File properties = new File(home, "bin/jmeter.properties");
+        if (properties.isFile()) {
+            JMeterUtils.loadJMeterProperties(properties.getAbsolutePath());
+        }
+    }
+
+    private static void addJMeterHome(File home) {
+        File lib = new File(home, "lib");
+        File ext = new File(lib, "ext");
+        addJars(lib);
+        addJars(ext);
+        PATHS.add(normalize(new File(home, "bin")));
+    }
+
+    private static void addJars(File directory) {
+        File[] jars = directory.listFiles(child -> child.getName().endsWith(".jar"));
+        if (jars == null) {
+            return;
+        }
+        for (File jar : jars) {
+            PATHS.add(normalize(jar));
+        }
+    }
+
+    private static File jmeterHome(File file) {
+        File normalized = normalize(file);
+        if (looksLikeJMeterHome(normalized)) {
+            return normalized;
+        }
+        if (normalized.isFile() && normalized.getName().startsWith("ApacheJMeter")) {
+            File lib = normalized.getParentFile();
+            File home = lib == null ? null : lib.getParentFile();
+            return looksLikeJMeterHome(home) ? normalize(home) : null;
+        }
+        if (normalized.isFile() && "jmeter.properties".equals(normalized.getName())) {
+            File bin = normalized.getParentFile();
+            File home = bin == null ? null : bin.getParentFile();
+            return looksLikeJMeterHome(home) ? normalize(home) : null;
+        }
+        return null;
+    }
+
+    private static boolean looksLikeJMeterHome(File directory) {
+        return directory != null
+                && new File(directory, "bin/jmeter.properties").isFile()
+                && new File(directory, "lib").isDirectory();
     }
 
     private static synchronized URLClassLoader classLoader() {

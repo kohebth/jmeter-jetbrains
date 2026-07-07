@@ -24,9 +24,6 @@ final class JMeterRunTreePreparer {
 
     private static void prepareElement(TestElement element) {
         JMeterElementMetadata.normalize(element);
-        if (element instanceof LoopController) {
-            prepareLoopController((LoopController) element);
-        }
         if (element instanceof AbstractThreadGroup) {
             prepareThreadGroup((AbstractThreadGroup) element);
         }
@@ -53,9 +50,6 @@ final class JMeterRunTreePreparer {
             controller = null;
         }
         if (controller != null) {
-            if (controller instanceof LoopController) {
-                prepareLoopController((LoopController) controller);
-            }
             return;
         }
 
@@ -67,18 +61,6 @@ final class JMeterRunTreePreparer {
         loopController.setProperty(TestElement.GUI_CLASS, "org.apache.jmeter.control.gui.LoopControlPanel");
         loopController.setProperty(TestElement.TEST_CLASS, LoopController.class.getName());
         threadGroup.setSamplerController(loopController);
-    }
-
-    private static void prepareLoopController(LoopController loopController) {
-        String loops = loopController.getLoopString();
-        if (!hasText(loops)) {
-            loopController.setLoops(1);
-            loopController.setContinueForever(false);
-            return;
-        }
-        if (!String.valueOf(LoopController.INFINITE_LOOP_COUNT).equals(loops.trim())) {
-            loopController.setContinueForever(false);
-        }
     }
 
     private static void prepareClassicThreadGroup(org.apache.jmeter.threads.ThreadGroup threadGroup) {

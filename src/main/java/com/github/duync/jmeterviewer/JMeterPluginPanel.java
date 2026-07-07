@@ -18,7 +18,7 @@ final class JMeterPluginPanel {
         store.applyToClasspath();
         DefaultListModel<String> model = new DefaultListModel<>();
         JList<String> list = new JList<>(model);
-        JButton add = new JButton("Add JAR/Folder");
+        JButton add = new JButton("Add JMeter Home/JAR");
         JButton remove = new JButton("Remove");
         JButton removeMissing = new JButton("Remove Missing");
         JButton refresh = new JButton("Refresh");
@@ -45,7 +45,9 @@ final class JMeterPluginPanel {
 
     private static void addPath(Project project, JMeterPluginClasspathStore store, DefaultListModel<String> model) {
         FileChooserDescriptor descriptor = new FileChooserDescriptor(true, true, true, true, false, true)
-                .withFileFilter(file -> file.isDirectory() || file.getName().endsWith(".jar"));
+                .withFileFilter(file -> file.isDirectory()
+                        || file.getName().endsWith(".jar")
+                        || file.getName().equals("jmeter.properties"));
         VirtualFile[] files = FileChooser.chooseFiles(descriptor, project, null);
         for (VirtualFile file : files) {
             store.add(new File(file.getPath()));

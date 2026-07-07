@@ -1,7 +1,6 @@
 package com.github.duync.jmeterviewer;
 
 import com.intellij.ui.TreeSpeedSearch;
-import org.apache.jmeter.gui.tree.JMeterCellRenderer;
 import org.apache.jmeter.gui.tree.JMeterTreeListener;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
@@ -21,9 +20,10 @@ final class JMeterTreeView {
     static JTree create(JMeterTreeModel model,
                         JMeterTreeListener listener,
                         JMeterTreeActions actions,
+                        JMeterThreadGroupActivity activity,
                         Runnable modified) {
         JTree tree = new JTree(model);
-        tree.setCellRenderer(new JMeterCellRenderer());
+        tree.setCellRenderer(new JMeterActivityTreeRenderer(activity));
         tree.setRootVisible(false);
         tree.setShowsRootHandles(true);
         tree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);

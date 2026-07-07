@@ -54,6 +54,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
     private final JMeterResultsPanel resultsPanel;
     private final JMeterRunOptions runOptions;
     private final JMeterThreadControlPanel threadControl;
+    private final JMeterThreadGroupActivity threadGroupActivity;
     private final JMeterSourcePanel sourcePanel;
     private final JMeterRunController runController;
     private final JMeterIdeUndoSupport undoSupport;
@@ -90,7 +91,9 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         this.validationAction = new JMeterValidationAction(() -> model, resultsPanel);
         this.statsAction = new JMeterStatsAction(() -> model, resultsPanel);
         this.runOptions = new JMeterRunOptions(project);
-        this.runController = new JMeterRunController(new JMeterEditorRunListener(this::setRunStatus, resultsPanel));
+        this.threadGroupActivity = new JMeterThreadGroupActivity();
+        this.runController = new JMeterRunController(
+                new JMeterEditorRunListener(this::setRunStatus, resultsPanel, threadGroupActivity));
         this.threadControl = new JMeterThreadControlPanel(runController);
         this.sourcePanel = new JMeterSourcePanel(project, file, this::load,
                 this::updateCurrentJMeterNode, () -> model, this);
@@ -154,7 +157,13 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         listener.setActionHandler(event -> showSelectedElement());
         GuiPackage.initInstance(listener, model);
 
-        tree = JMeterTreeView.create(model, listener, treeActions, this::markTreeModified);
+        threadGroupActivity.setChangeListener(() -> {
+            if (tree != null) {
+                tree.repaint();
+            }
+        });
+        threadGroupActivity.clear();
+        tree = JMeterTreeView.create(model, listener, treeActions, threadGroupActivity, this::markTreeModified);
         JMeterTreeFileActions fileActions = new JMeterTreeFileActions(project, model,
                 treeActions::selectedNode, treeActions::selectNode, this::markTreeModified);
         JMeterAddElementDialog addDialog = new JMeterAddElementDialog(project, treeActions);
@@ -225,6 +234,8 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         updateCurrentJMeterNode();
         resultsPanel.configureNativeResultViews(model);
         resultsPanel.clear();
+        threadGroupActivity.prepare(model);
+        threadGroupActivity.start();
         resultsPanel.appendDiagnostic("Starting test");
         resultsPanel.runStarted();
         resultsWorkspace.showViewResultsTree();

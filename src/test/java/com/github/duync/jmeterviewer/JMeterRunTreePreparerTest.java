@@ -11,7 +11,6 @@ import org.apache.jorphan.collections.HashTree;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,12 +47,14 @@ final class JMeterRunTreePreparerTest {
     }
 
     @Test
-    void finiteLoopCountDisablesContinueForeverBeforeRun() {
+    void preservesExistingLoopControllerBeforeRun() {
         ThreadGroup threadGroup = new ThreadGroup();
         LoopController loopController = new LoopController();
         loopController.setLoops(2);
-        loopController.setContinueForever(true);
         threadGroup.setSamplerController(loopController);
+        LoopController installed = assertInstanceOf(LoopController.class, threadGroup.getSamplerController());
+        installed.setProperty("LoopController.continue_forever", true);
+        String before = installed.getPropertyAsString("LoopController.continue_forever");
         HashTree tree = new HashTree();
         tree.add(threadGroup);
 
@@ -61,7 +62,7 @@ final class JMeterRunTreePreparerTest {
 
         LoopController prepared = assertInstanceOf(LoopController.class, threadGroup.getSamplerController());
         assertEquals(2, prepared.getLoops());
-        assertFalse(prepared.getPropertyAsBoolean("LoopController.continue_forever"));
+        assertEquals(before, prepared.getPropertyAsString("LoopController.continue_forever"));
     }
 
     @Test
