@@ -6,11 +6,21 @@ final class JMeterTemplate {
     private final String name;
     private final String description;
     private final java.util.List<Node> roots;
+    private final boolean custom;
 
     private JMeterTemplate(String name, String description, Node... roots) {
+        this(name, description, false, Arrays.asList(roots));
+    }
+
+    private JMeterTemplate(String name, String description, boolean custom, java.util.List<Node> roots) {
         this.name = name;
         this.description = description;
-        this.roots = Arrays.asList(roots);
+        this.custom = custom;
+        this.roots = roots;
+    }
+
+    static JMeterTemplate custom(String name, String description, java.util.List<Node> roots) {
+        return new JMeterTemplate(name, description, true, roots);
     }
 
     static java.util.List<JMeterTemplate> defaults() {
@@ -140,6 +150,14 @@ final class JMeterTemplate {
         return roots;
     }
 
+    boolean custom() {
+        return custom;
+    }
+
+    String name() {
+        return name;
+    }
+
     @Override
     public String toString() {
         return name;
@@ -147,6 +165,10 @@ final class JMeterTemplate {
 
     private static Node node(String element, Node... children) {
         return new Node(element, Arrays.asList(children));
+    }
+
+    static Node node(String element, java.util.List<Node> children) {
+        return new Node(element, children);
     }
 
     static final class Node {

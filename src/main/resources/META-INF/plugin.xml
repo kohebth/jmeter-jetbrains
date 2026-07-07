@@ -12,6 +12,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <fileType
                 name="JMeter Test Plan"
+                language="JMeter"
                 implementationClass="com.github.duync.jmeterviewer.JMeterFileType"
                 fieldName="INSTANCE"
                 extensions="jmx"/>
@@ -22,6 +23,7 @@
         <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterResultsWorkspace"/>
         <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterPluginClasspathStore"/>
         <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterRunProfileStore"/>
+        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterTemplateStore"/>
         <toolWindow
                 id="JMeter Results"
                 anchor="right"
