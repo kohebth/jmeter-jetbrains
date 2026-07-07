@@ -20,6 +20,7 @@
                 language="JMeter"
                 implementationClass="com.github.duync.jmeterviewer.JMeterStructureViewFactory"/>
         <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterResultsWorkspace"/>
+        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterPluginClasspathStore"/>
         <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterRunProfileStore"/>
         <toolWindow
                 id="JMeter Results"

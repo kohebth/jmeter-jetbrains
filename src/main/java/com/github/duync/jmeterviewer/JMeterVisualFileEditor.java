@@ -64,6 +64,7 @@ public final class JMeterVisualFileEditor implements FileEditor, Disposable {
         this.project = project;
         this.file = file;
         this.component = new JBPanel<>(new BorderLayout());
+        JMeterPluginClasspathStore.get(project).applyToClasspath();
         this.elementPanel = new JMeterElementPanel(this::markGuiModified);
         this.errorPane = new JEditorPane("text/plain", "");
         this.propertyChangeSupport = new PropertyChangeSupport(this);

@@ -18,10 +18,40 @@ final class JMeterPluginClasspath {
     static synchronized void add(VirtualFile file) {
         if (file != null) {
             add(new File(file.getPath()));
-            loader = null;
-            updateJMeterSearchPaths();
-            JMeterPaletteCatalog.reset();
+            resetRuntimeViews();
         }
+    }
+
+    static synchronized void addPath(File file) {
+        add(file);
+        resetRuntimeViews();
+    }
+
+    static synchronized void addPaths(Collection<String> paths) {
+        for (String path : paths) {
+            if (path != null && !path.trim().isEmpty()) {
+                add(new File(path.trim()));
+            }
+        }
+        resetRuntimeViews();
+    }
+
+    static synchronized void remove(File file) {
+        if (file != null) {
+            File normalized = normalize(file);
+            PATHS.removeIf(path -> samePath(path, normalized) || isChildJar(normalized, path));
+            resetRuntimeViews();
+        }
+    }
+
+    static synchronized void removeMissing() {
+        PATHS.removeIf(path -> !path.exists());
+        resetRuntimeViews();
+    }
+
+    static synchronized void clear() {
+        PATHS.clear();
+        resetRuntimeViews();
     }
 
     static synchronized List<File> paths() {
@@ -66,13 +96,21 @@ final class JMeterPluginClasspath {
         if (!file.exists()) {
             return;
         }
-        PATHS.add(file);
+        PATHS.add(normalize(file));
         if (file.isDirectory()) {
             File[] jars = file.listFiles(child -> child.getName().endsWith(".jar"));
             if (jars != null) {
-                PATHS.addAll(Arrays.asList(jars));
+                for (File jar : jars) {
+                    PATHS.add(normalize(jar));
+                }
             }
         }
+    }
+
+    private static void resetRuntimeViews() {
+        loader = null;
+        updateJMeterSearchPaths();
+        JMeterPaletteCatalog.reset();
     }
 
     private static void updateJMeterSearchPaths() {
@@ -104,5 +142,25 @@ final class JMeterPluginClasspath {
             }
         }
         return urls.toArray(new URL[0]);
+    }
+
+    private static File normalize(File file) {
+        try {
+            return file.getCanonicalFile();
+        } catch (Exception ignored) {
+            return file.getAbsoluteFile();
+        }
+    }
+
+    private static boolean samePath(File left, File right) {
+        return normalize(left).equals(normalize(right));
+    }
+
+    private static boolean isChildJar(File directory, File path) {
+        if (!directory.isDirectory() || !path.getName().endsWith(".jar")) {
+            return false;
+        }
+        File parent = normalize(path).getParentFile();
+        return parent != null && parent.equals(directory);
     }
 }
