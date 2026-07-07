@@ -6,7 +6,8 @@ import com.intellij.ui.components.JBScrollPane;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
 import org.apache.jmeter.testelement.TestElement;
-import org.apache.jmeter.testelement.property.*;
+import org.apache.jmeter.testelement.property.PropertyIterator;
+import org.apache.jmeter.testelement.property.StringProperty;
 
 import javax.swing.*;
 import java.awt.*;
@@ -107,7 +108,7 @@ final class JMeterSearchDialog {
         addIfMatch(node, "Test Class", element.getPropertyAsString(TestElement.TEST_CLASS), false, null);
         PropertyIterator properties = element.propertyIterator();
         while (properties.hasNext()) {
-            JMeterProperty property = properties.next();
+            org.apache.jmeter.testelement.property.JMeterProperty property = properties.next();
             boolean editable = property instanceof StringProperty
                     && !TestElement.GUI_CLASS.equals(property.getName())
                     && !TestElement.TEST_CLASS.equals(property.getName());

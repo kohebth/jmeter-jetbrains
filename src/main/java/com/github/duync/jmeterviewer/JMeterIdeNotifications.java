@@ -4,7 +4,7 @@ import com.intellij.notification.*;
 import com.intellij.openapi.project.Project;
 
 final class JMeterIdeNotifications {
-    private static final NotificationGroup GROUP = NotificationGroup.balloonGroup("JMeter Viewer");
+    private static final String GROUP_ID = "JMeter Viewer";
 
     private JMeterIdeNotifications() {
     }
@@ -22,6 +22,9 @@ final class JMeterIdeNotifications {
     }
 
     private static void notify(Project project, String message, NotificationType type) {
-        GROUP.createNotification(message, type).notify(project);
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(message, type)
+                .notify(project);
     }
 }

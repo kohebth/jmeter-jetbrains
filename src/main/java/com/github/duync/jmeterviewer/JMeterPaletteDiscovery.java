@@ -24,6 +24,7 @@ final class JMeterPaletteDiscovery {
         return items;
     }
 
+    @SuppressWarnings("deprecation")
     private static List<String> guiClassNames() {
         try {
             return ClassFinder.findClassesThatExtend(

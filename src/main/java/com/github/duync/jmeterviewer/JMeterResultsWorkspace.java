@@ -1,6 +1,5 @@
 package com.github.duync.jmeterviewer;
 
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
@@ -16,7 +15,7 @@ public final class JMeterResultsWorkspace {
     }
 
     static JMeterResultsWorkspace get(Project project) {
-        return ServiceManager.getService(project, JMeterResultsWorkspace.class);
+        return project.getService(JMeterResultsWorkspace.class);
     }
 
     JMeterResultsPanel resultsPanel() {

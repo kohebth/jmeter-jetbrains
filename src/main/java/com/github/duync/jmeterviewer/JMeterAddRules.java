@@ -12,7 +12,6 @@ import org.apache.jmeter.samplers.Sampler;
 import org.apache.jmeter.testelement.NonTestElement;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestPlan;
-import org.apache.jmeter.testelement.WorkBench;
 import org.apache.jmeter.threads.AbstractThreadGroup;
 import org.apache.jmeter.timers.Timer;
 
@@ -47,7 +46,7 @@ final class JMeterAddRules {
                     || element instanceof ConfigElement
                     || element instanceof SampleListener;
         }
-        if (parentElement instanceof WorkBench) {
+        if (isWorkBench(parentElement)) {
             return element instanceof NonTestElement || element instanceof TestElement;
         }
         if (parentElement instanceof AbstractThreadGroup || parentElement instanceof Controller) {
@@ -57,6 +56,10 @@ final class JMeterAddRules {
             return isSamplerChild(element);
         }
         return false;
+    }
+
+    private static boolean isWorkBench(TestElement element) {
+        return "org.apache.jmeter.testelement.WorkBench".equals(element.getClass().getName());
     }
 
     private static boolean isThreadChild(TestElement element) {

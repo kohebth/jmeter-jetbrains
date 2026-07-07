@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
     id("java")
     id("org.jetbrains.intellij") version "1.17.4"
@@ -42,6 +44,10 @@ intellij {
 }
 
 tasks {
+    withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:deprecation")
+    }
+
     patchPluginXml {
         sinceBuild.set("221")
         untilBuild.set(provider { null })

@@ -73,6 +73,7 @@ final class JMeterFunctionPanel {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private static java.util.List<Entry> discover() {
         java.util.List<Entry> entries = new ArrayList<>();
         try {

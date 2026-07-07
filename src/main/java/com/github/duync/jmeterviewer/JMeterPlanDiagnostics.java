@@ -3,7 +3,7 @@ package com.github.duync.jmeterviewer;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
 import org.apache.jmeter.testelement.TestElement;
-import org.apache.jmeter.testelement.property.*;
+import org.apache.jmeter.testelement.property.PropertyIterator;
 
 import java.io.File;
 import java.util.*;
@@ -54,7 +54,7 @@ final class JMeterPlanDiagnostics {
     private static void inspectProperties(JMeterTreeNode node, TestElement element, Report report) {
         PropertyIterator iterator = element.propertyIterator();
         while (iterator.hasNext()) {
-            JMeterProperty property = iterator.next();
+            org.apache.jmeter.testelement.property.JMeterProperty property = iterator.next();
             String value = property.getStringValue();
             if (empty(value)) {
                 continue;
