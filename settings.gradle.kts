@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "jmeter-jetbrains-viewer"
+rootProject.name = "jmeter-jetbrains-plugin"

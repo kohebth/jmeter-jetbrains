@@ -1,7 +1,7 @@
 <idea-plugin>
-    <id>com.github.duync.jmeterviewer</id>
+    <id>com.github.kohebth.jmeterviewer</id>
     <name>JMeter Viewer</name>
-    <vendor email="duync@example.com">duync</vendor>
+        <vendor email="ncdduy@hotmail.com">kohebth</vendor>
 
     <description><![CDATA[
         Opens Apache JMeter .jmx test plans as a visual tree inside JetBrains IDEs.
@@ -13,67 +13,67 @@
         <fileType
                 name="JMeter Test Plan"
                 language="XML"
-                implementationClass="com.github.duync.jmeterviewer.JMeterFileType"
+                implementationClass="com.github.kohebth.jmeterviewer.ide.JMeterFileType"
                 fieldName="INSTANCE"
                 extensions="jmx"/>
-        <fileEditorProvider implementation="com.github.duync.jmeterviewer.JMeterFileEditorProvider"/>
+        <fileEditorProvider implementation="com.github.kohebth.jmeterviewer.ide.JMeterFileEditorProvider"/>
         <psiStructureViewFactory
                 language="XML"
-                implementationClass="com.github.duync.jmeterviewer.JMeterStructureViewFactory"/>
-        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterResultsWorkspace"/>
-        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterPluginClasspathStore"/>
-        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterRunProfileStore"/>
-        <projectService serviceImplementation="com.github.duync.jmeterviewer.JMeterTemplateStore"/>
+                implementationClass="com.github.kohebth.jmeterviewer.structure.JMeterStructureViewFactory"/>
+        <projectService serviceImplementation="com.github.kohebth.jmeterviewer.results.JMeterResultsWorkspace"/>
+        <projectService serviceImplementation="com.github.kohebth.jmeterviewer.runtime.JMeterPluginClasspathStore"/>
+        <projectService serviceImplementation="com.github.kohebth.jmeterviewer.run.JMeterRunProfileStore"/>
+        <projectService serviceImplementation="com.github.kohebth.jmeterviewer.templates.JMeterTemplateStore"/>
         <projectConfigurable
                 id="jmeter.viewer"
                 displayName="JMeter"
-                instance="com.github.duync.jmeterviewer.JMeterSettingsConfigurable"/>
+                instance="com.github.kohebth.jmeterviewer.ide.JMeterSettingsConfigurable"/>
         <notificationGroup id="JMeter Viewer" displayType="BALLOON"/>
         <toolWindow
                 id="JMeter"
                 anchor="bottom"
-                factoryClass="com.github.duync.jmeterviewer.JMeterResultsToolWindowFactory"/>
+                factoryClass="com.github.kohebth.jmeterviewer.results.JMeterResultsToolWindowFactory"/>
     </extensions>
 
     <actions>
-        <action id="com.github.duync.jmeterviewer.SaveJMeterEditorsAction"
-                class="com.github.duync.jmeterviewer.SaveJMeterEditorsAction"
+        <action id="com.github.kohebth.jmeterviewer.SaveJMeterEditorsAction"
+                class="com.github.kohebth.jmeterviewer.ide.SaveJMeterEditorsAction"
                 text="Save JMeter Test Plan"
                 description="Save the active JMeter visual editor">
             <add-to-group group-id="FileMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterRunAction"
-                class="com.github.duync.jmeterviewer.JMeterRunAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterRunAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterRunAction"
                 text="Run JMeter Test"
                 description="Run the active JMeter test plan">
             <add-to-group group-id="RunMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterStopAction"
-                class="com.github.duync.jmeterviewer.JMeterStopAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterStopAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterStopAction"
                 text="Stop JMeter Test"
                 description="Stop the active JMeter test">
             <add-to-group group-id="RunMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterReloadAction"
-                class="com.github.duync.jmeterviewer.JMeterReloadAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterReloadAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterReloadAction"
                 text="Reload JMeter Test Plan"
                 description="Reload the active JMeter test plan from disk">
             <add-to-group group-id="FileMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterValidateEditorAction"
-                class="com.github.duync.jmeterviewer.JMeterValidateEditorAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterValidateEditorAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterValidateEditorAction"
                 text="Validate JMeter Test Plan"
                 description="Validate the active JMeter test plan">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterCommandsAction"
-                class="com.github.duync.jmeterviewer.JMeterCommandsAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterCommandsAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterCommandsAction"
                 text="JMeter Commands"
                 description="Open the JMeter command palette">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
-        <action id="com.github.duync.jmeterviewer.JMeterTemplatesAction"
-                class="com.github.duync.jmeterviewer.JMeterTemplatesAction"
+        <action id="com.github.kohebth.jmeterviewer.JMeterTemplatesAction"
+                class="com.github.kohebth.jmeterviewer.ide.JMeterTemplatesAction"
                 text="JMeter Templates"
                 description="Open JMeter templates">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
