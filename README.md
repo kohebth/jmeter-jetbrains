@@ -1,11 +1,20 @@
 # JMeter Viewer for JetBrains IDEs
 
-This plugin opens Apache JMeter `.jmx` files directly in PyCharm using JMeter's own Swing UI panels.
+This plugin opens Apache JMeter `.jmx` files directly in JetBrains IDEs such as PyCharm and IntelliJ IDEA, using JMeter's own Swing UI panels for the visual editor.
+
+Repository: https://github.com/kohebth/jmeter-jetbrains
+
+## Latest Snapshot
+
+Download the current pre-release build from [v0.1.2-SNAPSHOT](https://github.com/kohebth/jmeter-jetbrains/releases/tag/v0.1.2-SNAPSHOT).
+
+Install the ZIP in JetBrains IDEs with `Settings | Plugins | Install Plugin from Disk`.
 
 ## Features
 
 - Registers `.jmx` files as JMeter test plans.
-- Replaces the default editor with an embedded JMeter-style editor.
+- Adds an embedded JMeter-style visual editor before the IDE's default text editor.
+- Keeps the IDE text editor available for raw `.jmx` editing, Git highlighting, and normal IDE shortcuts.
 - Shows the JMeter test tree on the left.
 - Shows JMeter's native selected-element UI on the right.
 - Shows a categorized palette of bundled JMeter elements that can be dragged onto valid tree nodes.
@@ -18,13 +27,12 @@ This plugin opens Apache JMeter `.jmx` files directly in PyCharm using JMeter's 
 - Palette coverage includes bundled thread groups, test fragments, samplers, controllers, config elements, assertions, pre-processors, post-processors, timers, and listeners from the included JMeter modules.
 - Discovers additional addable `JMeterGUIComponent` implementations from JMeter runtime search paths and merges them into the palette when available.
 - Supports tree search with next/previous navigation across names, comments, GUI classes, and test classes.
-- Runs and stops the current test plan through JMeter's `StandardJMeterEngine`, with a compact sample log in the editor.
-- Displays run results in a sortable sample table with request/response details for the selected sample.
-- Displays run lifecycle messages and startup failures in a diagnostics log tab.
+- Runs and stops the current test plan through JMeter's `StandardJMeterEngine`.
+- Displays run results, request/response details, run status, and diagnostics in the bottom JMeter tool window.
 
 ## Editing Status
 
-Drag-and-drop additions, context-menu additions, runtime element discovery, basic tree editing, enable/disable, tree expand/collapse, tree search, explicit Save, basic Run/Stop, structured sample result viewing, and diagnostics logging are supported. Full JMeter editing parity is still in progress; full JMeter-native action routing, all listener visualizer behavior inside the IDE, distributed run controls, and automatic IDE save integration are not complete yet.
+Drag-and-drop additions, context-menu additions, runtime element discovery, basic tree editing, enable/disable, tree expand/collapse, tree search, explicit Save, raw IDE text editing, basic Run/Stop, structured sample result viewing, and diagnostics logging are supported. Full JMeter editing parity is still in progress; full JMeter-native action routing, all listener visualizer behavior inside the IDE, and distributed run controls are not complete yet.
 
 ## Compatibility
 
@@ -53,3 +61,4 @@ Use the checked-in Gradle wrapper. The JetBrains Gradle plugin required for PyCh
 ```
 
 The plugin ZIP is written under `build/distributions/`.
+Snapshot builds are named like `jmeter-jetbrains-plugin-<version>.zip`.
