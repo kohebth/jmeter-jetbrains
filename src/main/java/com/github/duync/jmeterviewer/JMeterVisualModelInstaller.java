@@ -25,10 +25,12 @@ final class JMeterVisualModelInstaller {
                              JMeterResultsPanel resultsPanel,
                              JMeterResultsWorkspace resultsWorkspace,
                              JMeterThreadGroupActivity threadGroupActivity,
-                             Runnable modified) {
+                             Runnable modified,
+                             Runnable suppressSelectionDirty) {
         JMeterTreeActions treeActions = new JMeterTreeActions(model, modified);
         JMeterTreeListener listener = new JMeterTreeListener(model);
-        listener.setActionHandler(event -> showSelectedElement(elementPanel, resultsPanel, resultsWorkspace));
+        listener.setActionHandler(event -> showSelectedElement(elementPanel, resultsPanel, resultsWorkspace,
+                suppressSelectionDirty));
         GuiPackage.initInstance(listener, model);
 
         Supplier<JTree> treeSupplier = () -> treeActionsTree(treeActions);
@@ -56,8 +58,7 @@ final class JMeterVisualModelInstaller {
                 addDialog, templateDialog, search);
 
         component.removeAll();
-        component.add(JMeterToolbarFactory.create(project, () -> model, toolbarState,
-                treeActions, fileActions, addDialog, templateDialog, commandPalette, search), BorderLayout.NORTH);
+        component.add(JMeterEditorToolbar.create(toolbarState), BorderLayout.NORTH);
         component.add(JMeterEditorBody.create(tree, elementPanel.component()), BorderLayout.CENTER);
         selectInitialNode(model, tree);
         return new Installed(tree, treeActions, commandPalette, templateDialog);
@@ -80,7 +81,9 @@ final class JMeterVisualModelInstaller {
 
     private static void showSelectedElement(JMeterElementPanel elementPanel,
                                             JMeterResultsPanel resultsPanel,
-                                            JMeterResultsWorkspace resultsWorkspace) {
+                                            JMeterResultsWorkspace resultsWorkspace,
+                                            Runnable suppressSelectionDirty) {
+        suppressSelectionDirty.run();
         elementPanel.showSelected();
         TestElement selected = selectedElement();
         JMeterActionTrace.info("editor.tree.selection",

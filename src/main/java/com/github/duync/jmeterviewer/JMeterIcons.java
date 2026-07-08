@@ -2,14 +2,13 @@ package com.github.duync.jmeterviewer;
 
 import com.intellij.ide.highlighter.XmlFileType;
 
-import javax.swing.Icon;
 import javax.swing.ImageIcon;
-import java.awt.Image;
+import javax.swing.Icon;
 import java.net.URL;
 
 final class JMeterIcons {
     static final Icon FILE = icon();
-    static final Icon TOOL_WINDOW = small(FILE, 13);
+    static final Icon TOOL_WINDOW = XmlFileType.INSTANCE.getIcon();
 
     private JMeterIcons() {
     }
@@ -19,11 +18,4 @@ final class JMeterIcons {
         return resource == null ? XmlFileType.INSTANCE.getIcon() : new ImageIcon(resource);
     }
 
-    private static Icon small(Icon icon, int size) {
-        if (!(icon instanceof ImageIcon)) {
-            return icon;
-        }
-        Image image = ((ImageIcon) icon).getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
-        return new ImageIcon(image);
-    }
 }

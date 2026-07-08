@@ -3,10 +3,17 @@ package com.github.duync.jmeterviewer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.content.Content;
+import com.intellij.ui.content.ContentManager;
+import com.intellij.ui.content.impl.ContentImpl;
+import com.intellij.ui.components.JBPanel;
 
 import javax.swing.Icon;
 import javax.swing.JComponent;
-import javax.swing.JTabbedPane;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
 import java.util.*;
 
 public final class JMeterResultsWorkspace {
@@ -14,12 +21,14 @@ public final class JMeterResultsWorkspace {
 
     private final Project project;
     private final JMeterResultsPanel resultsPanel = new JMeterResultsPanel();
-    private final List<TabSpec> leadingTabs = new ArrayList<>();
-    private final List<TabSpec> trailingTabs = new ArrayList<>();
-    private final EnumMap<JMeterNativeResultView, TabSpec> nativeTabs =
+    private final List<ContentSpec> leadingContents = new ArrayList<>();
+    private final List<ContentSpec> trailingContents = new ArrayList<>();
+    private final EnumMap<JMeterNativeResultView, ContentSpec> nativeContents =
             new EnumMap<>(JMeterNativeResultView.class);
+    private final JPanel runControlsPanel = new JBPanel<>(new BorderLayout());
     private EnumSet<JMeterNativeResultView> availableNativeViews = EnumSet.noneOf(JMeterNativeResultView.class);
-    private JTabbedPane toolWindowTabs;
+    private ToolWindow toolWindow;
+    private Object runControlsOwner;
 
     public JMeterResultsWorkspace(Project project) {
         this.project = project;
@@ -33,18 +42,47 @@ public final class JMeterResultsWorkspace {
         return resultsPanel;
     }
 
-    void installTabs(JTabbedPane toolWindowTabs,
-                     List<TabSpec> leadingTabs,
-                     Map<JMeterNativeResultView, TabSpec> nativeTabs,
-                     List<TabSpec> trailingTabs) {
-        this.toolWindowTabs = toolWindowTabs;
-        this.leadingTabs.clear();
-        this.leadingTabs.addAll(leadingTabs);
-        this.nativeTabs.clear();
-        this.nativeTabs.putAll(nativeTabs);
-        this.trailingTabs.clear();
-        this.trailingTabs.addAll(trailingTabs);
-        rebuildTabs();
+    JComponent runControlsComponent() {
+        return runControlsPanel;
+    }
+
+    void setRunControls(Object owner,
+                        JComponent runOptions,
+                        JComponent threadControl,
+                        JLabel statusLabel) {
+        runControlsOwner = owner;
+        JPanel row = new JBPanel<>(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        row.add(runOptions);
+        row.add(threadControl);
+        row.add(statusLabel);
+        runControlsPanel.removeAll();
+        runControlsPanel.add(row, BorderLayout.CENTER);
+        runControlsPanel.revalidate();
+        runControlsPanel.repaint();
+    }
+
+    void clearRunControls(Object owner) {
+        if (runControlsOwner != owner) {
+            return;
+        }
+        runControlsOwner = null;
+        runControlsPanel.removeAll();
+        runControlsPanel.revalidate();
+        runControlsPanel.repaint();
+    }
+
+    void installContents(ToolWindow toolWindow,
+                         List<ContentSpec> leadingContents,
+                         Map<JMeterNativeResultView, ContentSpec> nativeContents,
+                         List<ContentSpec> trailingContents) {
+        this.toolWindow = toolWindow;
+        this.leadingContents.clear();
+        this.leadingContents.addAll(leadingContents);
+        this.nativeContents.clear();
+        this.nativeContents.putAll(nativeContents);
+        this.trailingContents.clear();
+        this.trailingContents.addAll(trailingContents);
+        rebuildContents();
     }
 
     void updateNativeResultViews(EnumSet<JMeterNativeResultView> views) {
@@ -55,13 +93,13 @@ public final class JMeterResultsWorkspace {
             return;
         }
         availableNativeViews = next;
-        rebuildTabs();
+        rebuildContents();
     }
 
     void show() {
-        ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID);
-        if (toolWindow != null) {
-            toolWindow.show();
+        ToolWindow currentToolWindow = currentToolWindow();
+        if (currentToolWindow != null) {
+            currentToolWindow.show();
         }
     }
 
@@ -78,79 +116,90 @@ public final class JMeterResultsWorkspace {
     }
 
     private void showContent(String contentName) {
-        ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID);
+        ToolWindow currentToolWindow = currentToolWindow();
+        if (currentToolWindow == null) {
+            return;
+        }
+        Content content = currentToolWindow.getContentManager().findContent(contentName);
+        if (content != null) {
+            currentToolWindow.getContentManager().setSelectedContent(content, true);
+        }
+        currentToolWindow.show();
+    }
+
+    private void rebuildContents() {
         if (toolWindow == null) {
             return;
         }
-        if (toolWindowTabs != null) {
-            for (int i = 0; i < toolWindowTabs.getTabCount(); i++) {
-                if (contentName.equals(toolWindowTabs.getTitleAt(i))) {
-                    toolWindowTabs.setSelectedIndex(i);
-                    break;
-                }
-            }
-        }
-        toolWindow.show();
-    }
-
-    private void rebuildTabs() {
-        if (toolWindowTabs == null) {
-            return;
-        }
-        String selected = selectedTitle();
-        toolWindowTabs.removeAll();
-        addTabs(leadingTabs);
+        ContentManager manager = toolWindow.getContentManager();
+        String selected = selectedContentName(manager);
+        clearContents(manager);
+        addContents(manager, leadingContents);
         for (JMeterNativeResultView view : JMeterNativeResultView.values()) {
             if (availableNativeViews.contains(view)) {
-                addTab(nativeTabs.get(view));
+                addContent(manager, nativeContents.get(view));
             }
         }
-        addTabs(trailingTabs);
-        restoreSelection(selected);
+        addContents(manager, trailingContents);
+        restoreSelection(manager, selected);
     }
 
-    private String selectedTitle() {
-        if (toolWindowTabs == null || toolWindowTabs.getSelectedIndex() < 0) {
-            return null;
+    private ToolWindow currentToolWindow() {
+        if (toolWindow != null) {
+            return toolWindow;
         }
-        return toolWindowTabs.getTitleAt(toolWindowTabs.getSelectedIndex());
+        return ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID);
     }
 
-    private void addTabs(List<TabSpec> specs) {
-        for (TabSpec spec : specs) {
-            addTab(spec);
+    private String selectedContentName(ContentManager manager) {
+        Content selected = manager.getSelectedContent();
+        return selected == null ? null : selected.getDisplayName();
+    }
+
+    private void clearContents(ContentManager manager) {
+        while (manager.getContentCount() > 0) {
+            manager.removeContent(manager.getContent(0), false);
         }
     }
 
-    private void addTab(TabSpec spec) {
+    private void addContents(ContentManager manager, List<ContentSpec> specs) {
+        for (ContentSpec spec : specs) {
+            addContent(manager, spec);
+        }
+    }
+
+    private void addContent(ContentManager manager, ContentSpec spec) {
         if (spec == null) {
             return;
         }
-        toolWindowTabs.addTab(spec.title, spec.icon, spec.component);
+        Content content = new ContentImpl(spec.component, spec.title, false);
+        if (spec.icon != null) {
+            content.setIcon(spec.icon);
+            content.setPopupIcon(spec.icon);
+        }
+        manager.addContent(content);
     }
 
-    private void restoreSelection(String selected) {
+    private void restoreSelection(ContentManager manager, String selected) {
         if (selected == null) {
             return;
         }
-        for (int i = 0; i < toolWindowTabs.getTabCount(); i++) {
-            if (selected.equals(toolWindowTabs.getTitleAt(i))) {
-                toolWindowTabs.setSelectedIndex(i);
-                return;
-            }
+        Content content = manager.findContent(selected);
+        if (content != null) {
+            manager.setSelectedContent(content, true);
         }
     }
 
-    static TabSpec tab(String title, Icon icon, JComponent component) {
-        return new TabSpec(title, icon, component);
+    static ContentSpec content(String title, Icon icon, JComponent component) {
+        return new ContentSpec(title, icon, component);
     }
 
-    static final class TabSpec {
+    static final class ContentSpec {
         private final String title;
         private final Icon icon;
         private final JComponent component;
 
-        private TabSpec(String title, Icon icon, JComponent component) {
+        private ContentSpec(String title, Icon icon, JComponent component) {
             this.title = title;
             this.icon = icon;
             this.component = component;

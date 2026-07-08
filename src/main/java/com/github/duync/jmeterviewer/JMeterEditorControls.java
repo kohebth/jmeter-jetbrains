@@ -15,20 +15,11 @@ final class JMeterEditorControls {
                      Runnable reload,
                      Runnable run,
                      Runnable runSelected,
-                     Runnable runLocal,
-                     Runnable runRemote,
-                     Runnable runAll,
                      JMeterRunController runController,
                      JMeterValidationAction validationAction,
                      Runnable commands) {
-        state.saveButton.addActionListener(event -> save.run());
-        state.reloadButton.addActionListener(event -> reload.run());
-        state.saveButton.setEnabled(false);
         state.runButton.addActionListener(event -> run.run());
         state.runSelectedButton.addActionListener(event -> runSelected.run());
-        state.runLocalButton.addActionListener(event -> runLocal.run());
-        state.runRemoteButton.addActionListener(event -> runRemote.run());
-        state.runAllButton.addActionListener(event -> runAll.run());
         state.stopButton.addActionListener(event -> runController.stop());
         state.shutdownButton.addActionListener(event -> runController.shutdown());
         state.resetEnginesButton.addActionListener(event -> runController.resetEngines());
