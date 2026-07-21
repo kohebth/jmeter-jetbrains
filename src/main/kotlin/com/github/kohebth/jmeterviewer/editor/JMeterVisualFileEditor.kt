@@ -99,8 +99,10 @@ class JMeterVisualFileEditor(
         host.repaint()
     }
 
-    internal fun showSwitchBlocked() {
-        showStatus("Another JMeter tab could not be saved. Resolve it before switching plans.")
+    internal fun showSwitchBlocked(
+        message: String = "Another JMeter tab could not be saved. Resolve it before switching plans.",
+    ) {
+        showStatus(message)
     }
 
     internal fun requestReselect() {

@@ -73,6 +73,12 @@ internal class JMeterRuntime private constructor(
             "saveservice_properties",
             installation.saveServicePropertiesFile.fileName.toString(),
         )
+        invoke(
+            utils.getMethod("setProperty", String::class.java, String::class.java),
+            null,
+            "undo.history.size",
+            "0",
+        )
         invoke(utils.getMethod("initLocale"), null)
 
         val saveService = classLoader.loadClass(SAVE_SERVICE_CLASS)

@@ -529,6 +529,50 @@ public final class GuiPackage implements LocaleChangeListener, HistoryListener {
         }
     }
 
+    /**
+     * Flush the visible editor into its current test element without
+     * reconfiguring the Swing component afterwards.
+     *
+     * <p>Embedded hosts poll JMeter's dirty state while a user is typing. The
+     * normal action router calls {@link #updateCurrentGui()}, which configures
+     * the component again and resets text carets and selections. This method
+     * deliberately commits the component on every call, keeps it editable for
+     * the next poll, and only notifies the tree when the element actually
+     * changed.</p>
+     */
+    public boolean updateCurrentNodePreservingEditorState() {
+        try {
+            if (currentNode == null) {
+                currentNode = treeListener.getCurrentNode();
+            }
+            if (currentNode == null) {
+                return false;
+            }
+
+            TestElement element = currentNode.getTestElement();
+            JMeterGUIComponent component = getGui(element);
+            if (component == null) {
+                log.debug("No component found for {}", currentNode.getName());
+                return false;
+            }
+
+            int before = getTestElementCheckSum(element);
+            component.modifyTestElement(element);
+            int after = getTestElementCheckSum(element);
+            if (before != after) {
+                currentNode.nameChanged();
+            }
+
+            // The form remains live and may receive more input before the next
+            // dirty poll. Do not mark it as permanently synchronized.
+            currentNodeUpdated = false;
+            return before != after;
+        } catch (Exception e) {
+            log.error("Problem updating current gui without refresh", e);
+            return false;
+        }
+    }
+
     public JMeterTreeNode getCurrentNode() {
         return treeListener.getCurrentNode();
     }

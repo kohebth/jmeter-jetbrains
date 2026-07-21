@@ -26,6 +26,13 @@
                 serviceImplementation="com.github.kohebth.jmeterviewer.runtime.JMeterSettings"/>
         <applicationService
                 serviceImplementation="com.github.kohebth.jmeterviewer.editor.JMeterWorkspaceService"/>
+        <projectService
+                serviceImplementation="com.github.kohebth.jmeterviewer.toolwindow.JMeterToolWindowController"/>
+        <toolWindow
+                id="JMeter"
+                anchor="bottom"
+                icon="/icons/jmeter-feather.gif"
+                factoryClass="com.github.kohebth.jmeterviewer.toolwindow.JMeterToolWindowFactory"/>
         <applicationConfigurable
                 id="jmeter.viewer.settings"
                 parentId="tools"
