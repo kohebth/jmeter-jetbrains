@@ -53,6 +53,8 @@ public final class ActionRouter implements ActionListener {
     private final Map<String, Set<ActionListener>> postActionListeners =
             new HashMap<>();
 
+    private ActionListener embeddedPostActionListener;
+
     // New action will clear undo, no point in having a transaction. Same with open
     // EMI: XXX: Commands could also have an annotation to sigal the Undo preference
     private final List<String> NO_TRANSACTION_ACTIONS = Arrays.asList(ActionNames.CLOSE, ActionNames.OPEN, ActionNames.OPEN_RECENT);
@@ -107,7 +109,22 @@ public final class ActionRouter implements ActionListener {
             if(!NO_TRANSACTION_ACTIONS.contains(actionCommand)) {
                 GuiPackage.getInstance().endUndoTransaction();
             }
+            ActionListener listener = embeddedPostActionListener;
+            if (listener != null) {
+                listener.actionPerformed(e);
+            }
         }
+    }
+
+    /**
+     * Set a host callback invoked after every native command. This is used by
+     * embedded document owners to schedule a JMX snapshot without installing
+     * a separate listener on every JMeter action class.
+     *
+     * @param listener callback, or {@code null} to remove it
+     */
+    public void setEmbeddedPostActionListener(ActionListener listener) {
+        embeddedPostActionListener = listener;
     }
 
     /**

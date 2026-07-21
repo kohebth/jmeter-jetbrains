@@ -171,11 +171,75 @@ public class Start extends AbstractAction {
     }
 
     /**
+     * Return whether the current tree selection contains at least one thread
+     * group that can be started by an embedding host.
+     *
+     * @return {@code true} when a selected-thread-group run can start
+     */
+    public boolean canRunSelectedThreadGroups() {
+        if (isEmbeddedTestRunning()) {
+            return false;
+        }
+        JMeterTreeNode[] nodes = GuiPackage.getInstance().getTreeListener().getSelectedNodes();
+        nodes = Copy.keepOnlyAncestors(nodes);
+        return keepOnlyThreadGroups(nodes).length > 0;
+    }
+
+    /**
+     * Start only the selected thread groups and attach listeners that exist
+     * solely in the cloned execution tree. No save prompt or result-file
+     * confirmation is shown for embedded runs.
+     *
+     * @param transientListeners result collectors owned by the embedding host
+     * @return {@code true} when a run was started
+     */
+    public boolean startSelectedThreadGroups(List<TestElement> transientListeners) {
+        if (isEmbeddedTestRunning()) {
+            return false;
+        }
+        JMeterTreeNode[] nodes = GuiPackage.getInstance().getTreeListener().getSelectedNodes();
+        nodes = Copy.keepOnlyAncestors(nodes);
+        AbstractThreadGroup[] threadGroups = keepOnlyThreadGroups(nodes);
+        if (threadGroups.length == 0) {
+            return false;
+        }
+        startEngine(threadGroups, RunMode.AS_IS, transientListeners, false);
+        return engine != null && engine.isActive();
+    }
+
+    /** Request an orderly stop of the active embedded test. */
+    public void shutdownEmbeddedTest() {
+        if (engine != null && engine.isActive()) {
+            engine.askThreadsToStop();
+        }
+    }
+
+    /** Stop the active embedded test immediately. */
+    public void stopEmbeddedTest() {
+        if (engine != null && engine.isActive()) {
+            engine.stopTest();
+        }
+    }
+
+    /** @return whether this command currently owns an active local engine. */
+    public boolean isEmbeddedTestRunning() {
+        return engine != null && engine.isActive();
+    }
+
+    /**
      * Start JMeter engine
      * @param threadGroupsToRun Array of AbstractThreadGroup to run
      * @param runMode {@link RunMode} How to run engine
      */
     private void startEngine(AbstractThreadGroup[] threadGroupsToRun, RunMode runMode) {
+        startEngine(threadGroupsToRun, runMode, java.util.Collections.emptyList(), true);
+    }
+
+    private void startEngine(
+            AbstractThreadGroup[] threadGroupsToRun,
+            RunMode runMode,
+            List<TestElement> transientListeners,
+            boolean confirmExistingResultFiles) {
         GuiPackage gui = GuiPackage.getInstance();
         HashTree testTree = gui.getTreeModel().getTestPlan();
 
@@ -186,14 +250,18 @@ public class Start extends AbstractAction {
         if(threadGroupsToRun != null && threadGroupsToRun.length>0) {
             keepOnlySelectedThreadGroupsInHashTree(treeToUse, threadGroupsToRun);
         }
-        treeToUse.add(treeToUse.getArray()[0], gui.getMainFrame());
+        Object testPlan = treeToUse.getArray()[0];
+        for (TestElement transientListener : transientListeners) {
+            treeToUse.add(testPlan, transientListener);
+        }
+        treeToUse.add(testPlan, gui.getMainFrame());
         if (log.isDebugEnabled()) {
             log.debug("test plan before cloning is running version: {}",
                     ((TestPlan) treeToUse.getArray()[0]).isRunningVersion());
         }
 
         ListedHashTree clonedTree = cloneTree(treeToUse, runMode);
-        if ( popupCheckExistingFileListener(clonedTree) ) {
+        if (!confirmExistingResultFiles || popupCheckExistingFileListener(clonedTree)) {
             engine = new StandardJMeterEngine();
             engine.configure(clonedTree);
             try {
@@ -201,6 +269,7 @@ public class Start extends AbstractAction {
             } catch (JMeterEngineException e) {
                 JOptionPane.showMessageDialog(gui.getMainFrame(), e.getMessage(),
                         JMeterUtils.getResString("error_occurred"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$
+                engine = null;
             }
             if (log.isDebugEnabled()) {
                 log.debug("test plan after cloning and running test is running version: {}",
