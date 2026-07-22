@@ -631,11 +631,19 @@ internal class JMeterEditorSession(
                 application.runWriteAction(mutation)
             }
         }
+        val commandProcessor = CommandProcessor.getInstance()
         if (!jetbrainsVisualUndoEnabled) {
-            UndoUtil.disableUndoIn(editor.document, writeMutation)
+            // Disabling undo recording is not itself a legal Document command boundary.
+            val mutationWithoutUndo = Runnable {
+                UndoUtil.disableUndoIn(editor.document, writeMutation)
+            }
+            if (commandProcessor.currentCommand != null) {
+                mutationWithoutUndo.run()
+            } else {
+                commandProcessor.runUndoTransparentAction(mutationWithoutUndo)
+            }
             return
         }
-        val commandProcessor = CommandProcessor.getInstance()
         if (commandProcessor.currentCommand != null) {
             writeMutation.run()
             commandProcessor.addAffectedDocuments(editor.project, editor.document)

@@ -16,6 +16,7 @@ class JMeterSuspendedFeaturesContractTest {
             ),
         )
 
+        assertTrue(source.contains("commandProcessor.runUndoTransparentAction(mutationWithoutUndo)"))
         assertTrue(source.contains("UndoUtil.disableUndoIn(editor.document, writeMutation)"))
         assertTrue(source.contains("performHistoryActionIfEnabled("))
         assertTrue(source.contains("private fun performHistoryAction("))
