@@ -116,11 +116,13 @@ internal class JMeterToolWindowController : Disposable {
         aggregateHost.unmount("Run selected Thread Group(s) to collect aggregate metrics")
     }
 
-    fun selectResultsTree() {
+    fun selectResultsTree(showWindow: Boolean = true) {
         val window = toolWindow ?: return
         val resultsContent = window.contentManager.findContent(RESULTS_TREE_TAB) ?: return
         window.contentManager.setSelectedContent(resultsContent)
-        window.show()
+        if (showWindow) {
+            window.show()
+        }
     }
 
     fun selectTestPlan() {
@@ -134,10 +136,18 @@ internal class JMeterToolWindowController : Disposable {
         outlineHost.clearSearch()
     }
 
+    fun showSearch() {
+        selectTestPlan()
+        outlineHost.showSearch()
+    }
+
     fun visibleTextRoots(): List<JComponent> = listOfNotNull(
         resultsHost.mountedComponent,
         aggregateHost.mountedComponent,
     )
+
+    fun shortcutRoots(): List<JComponent> = toolWindow?.component?.let(::listOf)
+        ?: listOf(outlineHost, resultsHost, aggregateHost)
 
     private fun clearCurrentResults() {
         if (currentSessionId != null) {
@@ -153,7 +163,9 @@ internal class JMeterToolWindowController : Disposable {
 
     private class TestPlanHost : JPanel(BorderLayout()) {
         private val searchToggle = JButton("Search")
-        private val searchPanel = SearchPanel()
+        private val searchPanel = SearchPanel(
+            jetbrainsHistoryEnabled = JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED,
+        )
         private var splitPane: JSplitPane? = null
         private var mountedComponent: JComponent? = null
         private var workspace: JMeterWorkspace? = null
@@ -224,6 +236,11 @@ internal class JMeterToolWindowController : Disposable {
             searchPanel.clear()
         }
 
+        fun showSearch() {
+            setSearchVisible(true)
+            searchPanel.focusSearch()
+        }
+
         private fun search(query: String, caseSensitive: Boolean, regexp: Boolean) =
             workspace?.searchTestPlan(query, caseSensitive, regexp).orEmpty()
 
@@ -280,7 +297,9 @@ internal class JMeterToolWindowController : Disposable {
         }
     }
 
-    private class SearchPanel : JPanel(BorderLayout(6, 6)) {
+    private class SearchPanel(
+        private val jetbrainsHistoryEnabled: Boolean,
+    ) : JPanel(BorderLayout(6, 6)) {
         var onSearch: ((String, Boolean, Boolean) -> List<JMeterSearchMatch>)? = null
         var onReset: (() -> Unit)? = null
         var onSelect: ((JMeterSearchMatch) -> Unit)? = null
@@ -344,13 +363,19 @@ internal class JMeterToolWindowController : Disposable {
                 results.selectedValue?.let { replace(listOf(it)) }
             }
             replaceAllButton.addActionListener { replace(modelValues()) }
-            val shortcutMask = if (SystemInfo.isMac) InputEvent.META_DOWN_MASK else InputEvent.CTRL_DOWN_MASK
-            installHistoryShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask), false)
-            installHistoryShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_Y, shortcutMask), true)
-            installHistoryShortcut(
-                KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask or InputEvent.SHIFT_DOWN_MASK),
-                true,
-            )
+            if (jetbrainsHistoryEnabled) {
+                val shortcutMask = if (SystemInfo.isMac) {
+                    InputEvent.META_DOWN_MASK
+                } else {
+                    InputEvent.CTRL_DOWN_MASK
+                }
+                installHistoryShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask), false)
+                installHistoryShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_Y, shortcutMask), true)
+                installHistoryShortcut(
+                    KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask or InputEvent.SHIFT_DOWN_MASK),
+                    true,
+                )
+            }
             results.cellRenderer = javax.swing.ListCellRenderer { list, value, index, selected, focused ->
                 val label = DefaultListCellRenderer().getListCellRendererComponent(
                     list,

@@ -18,8 +18,9 @@ in that installation's `lib/ext` directory.
 
 An invalid or unsupported directory is rejected in Settings. If no installation
 is configured, the editor offers a **Configure JMeter** action. Changing or
-clearing the configured home after JMeter's native editor has loaded requires an
-IDE restart because JMeter keeps process-global GUI state.
+clearing the configured home while visual sessions are open requires an IDE
+restart. Closing all visual JMX tabs first allows the installation to be changed
+without mixing two JMeter homes.
 
 ## Editor ownership
 
@@ -29,11 +30,13 @@ external-change handling, and the application look and feel. JMeter's standalone
 toolbar, menu bar, logger, and file actions are not exposed. The native tree's
 right-click **Start**, **Start no pauses**, and **Validate** actions are retained.
 
-JMeter's GUI state is process-global, so the plugin deliberately owns one shared
-native workspace. Before another visual JMX tab becomes active, the current
-model is flushed into the IDE document and saved. A save failure cancels the
-switch. If XML and visual state both changed, the editor offers `Reload
-external`, `Overwrite visual`, or `Cancel`.
+Each open physical JMX file owns an isolated JMeter class loader, native
+workspace, result views, undo state, and process slot. Different files can be
+edited and run simultaneously across IDE project windows. Opening the same
+physical file visually twice is intentionally blocked; the second window keeps
+its XML editor available until the first visual tab closes. If XML and visual
+state both changed, the editor offers `Reload external`, `Overwrite visual`, or
+`Cancel`.
 
 The editor supports local physical JMX files and loads the standard modules and
 compatible third-party plugins from the selected JMeter 5.6.3 installation.
@@ -43,17 +46,28 @@ JetBrains UI.
 Multiline fields currently use JMeter's native Swing editors. The experimental
 IntelliJ text-area adapter, language selection, and reformatting implementation
 remain in the source behind a disabled feature switch for later debugging.
-Per-field undo and visual-form JMX undo are also temporarily suspended; undo in
-the XML source editor remains available. Test Plan search starts collapsed and
-can be opened with the **Search** button or `Ctrl+F` (`Cmd+F` on macOS).
+JMeter's bounded native per-field undo remains available. Only JetBrains-backed
+visual JMX undo is temporarily suspended; undo in the XML source editor remains
+available. Test Plan search starts collapsed and can be opened with the
+**Search** button or `Ctrl+F` (`Cmd+F` on macOS).
+
+JMeter's embedded-safe shortcuts are registered only on the visual editor and
+its JMeter tool window. Native text-field copy, cut, paste, select-all, undo, and
+redo take priority. Tree copy/cut/paste supports multiple selected nodes,
+preserves source order, removes descendants whose ancestor is selected, and
+uses a portable JMX clipboard flavor so nodes can be pasted into another JMX
+file or IDE window. Native right-click **Add** menus include compatible
+third-party elements from the configured installation.
 
 Selected thread groups run through a normal IntelliJ **JMeter Selected Thread
 Groups** Run Configuration and the configured installation's `bin/jmeter`
-launcher (`jmeter.bat` on Windows). The IDE process console owns Stop, only one
-JMeter process may run at a time, and the shared visual workspace remains bound
-to that JMX until completion. Other XML editors remain usable. A token-protected
-loopback bridge streams samples into the native **Results Tree** and **Aggregate
-Report** tabs, with a temporary journal as a delivery fallback.
+launcher (`jmeter.bat` on Windows). Each JMX file permits one run at a time, while
+different files may run in parallel. Temporary configurations are pinned to the
+exact JMX session and do not activate the IDE Run tool window. A token-protected
+loopback bridge streams samples into that file's native **Results Tree** and
+**Aggregate Report** tabs, with a temporary journal as a delivery fallback.
+Background sessions never replace the tool-window surfaces of the JMX file the
+user is currently viewing.
 
 The process uses a valid inherited `JAVA_HOME`/`JRE_HOME` when available and
 otherwise falls back to the IDE runtime. Its Java `bin` directory is added to
@@ -94,9 +108,11 @@ default local JDK path with `JMETER_VIEWER_JAVA_HOME=/path/to/jdk-17`.
 arguments.
 
 `gui-smoke-jdk17.sh` uses an existing display or a local Xvfb instance to open,
-snapshot, and reopen a complex JMX plan in JMeter's native workspace. It then
-runs three selected thread groups against an embedded localhost server and
-verifies the live request and response data in Results Tree.
+snapshot, and reopen a complex JMX plan in JMeter's native workspace. It also
+opens two isolated workspaces together, verifies cross-classloader multi-node
+copy/paste and a third-party native context-menu Add action, then runs three
+selected thread groups against an embedded localhost server and verifies the
+live request and response data in Results Tree.
 `verify-jdk17.sh` includes that smoke test after the complete headless suite,
 builds the distributable, checks that no JMeter installation or conflicting
 runtime libraries were bundled, and enforces a 5 MiB archive-size ceiling.

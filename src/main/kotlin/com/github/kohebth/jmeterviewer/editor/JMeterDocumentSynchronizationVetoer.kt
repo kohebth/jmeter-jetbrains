@@ -7,11 +7,11 @@ import com.intellij.openapi.vfs.VirtualFile
 
 class JMeterDocumentSynchronizationVetoer : FileDocumentSynchronizationVetoer() {
     override fun maySaveDocument(document: Document, isSaveExplicit: Boolean): Boolean =
-        workspaceIfCreated()?.maySaveDocument(document) ?: true
+        registryIfCreated()?.maySaveDocument(document) ?: true
 
     override fun mayReloadFileContent(file: VirtualFile, document: Document): Boolean =
-        workspaceIfCreated()?.mayReloadFile(file, document) ?: true
+        registryIfCreated()?.mayReloadFile(file, document) ?: true
 
-    private fun workspaceIfCreated(): JMeterWorkspaceService? =
-        ApplicationManager.getApplication().getServiceIfCreated(JMeterWorkspaceService::class.java)
+    private fun registryIfCreated(): JMeterDocumentSessionRegistry? =
+        ApplicationManager.getApplication().getServiceIfCreated(JMeterDocumentSessionRegistry::class.java)
 }

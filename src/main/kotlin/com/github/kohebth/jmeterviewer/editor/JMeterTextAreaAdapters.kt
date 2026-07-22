@@ -73,6 +73,7 @@ internal class JMeterTextAreaAdapters(
     private val project: Project,
     private val roots: () -> Collection<JComponent>,
     private val adaptMultilineTextAreas: Boolean,
+    private val jetbrainsHistoryEnabled: Boolean,
     private val onFocusStarted: () -> Unit,
     private val onFocusEnded: () -> Unit,
     private val onFieldChanged: () -> Unit,
@@ -106,7 +107,9 @@ internal class JMeterTextAreaAdapters(
     }
 
     init {
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyDispatcher)
+        if (jetbrainsHistoryEnabled) {
+            KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyDispatcher)
+        }
         reconcileTimer.isRepeats = false
         scan()
     }
@@ -316,7 +319,7 @@ internal class JMeterTextAreaAdapters(
     }
 
     private fun dispatchHistoryShortcut(event: KeyEvent): Boolean {
-        if (disposed || event.id != KeyEvent.KEY_PRESSED) {
+        if (!jetbrainsHistoryEnabled || disposed || event.id != KeyEvent.KEY_PRESSED) {
             return false
         }
         val shortcutMask = if (SystemInfo.isMac) InputEvent.META_DOWN_MASK else InputEvent.CTRL_DOWN_MASK
@@ -352,7 +355,9 @@ internal class JMeterTextAreaAdapters(
         }
         disposed = true
         reconcileTimer.stop()
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyDispatcher)
+        if (jetbrainsHistoryEnabled) {
+            KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyDispatcher)
+        }
         observedRoots.forEach { it.removeHierarchyListener(hierarchyListener) }
         observedRoots.clear()
         observedContainers.forEach { it.removeContainerListener(containerListener) }
@@ -397,8 +402,6 @@ internal class JMeterTextAreaAdapters(
         init {
             source.addFocusListener(focusListener)
             document.addDocumentListener(documentListener)
-            source.actionMap.remove("undo")
-            source.actionMap.remove("redo")
         }
 
         fun captureFocus(): JMeterFieldFocus = JMeterFieldFocus(
@@ -485,8 +488,6 @@ internal class JMeterTextAreaAdapters(
             }
             ideDocument.addDocumentListener(ideDocumentListener)
             source.document.addDocumentListener(swingDocumentListener)
-            source.actionMap.remove("undo")
-            source.actionMap.remove("redo")
             editor.contentComponent.addFocusListener(object : FocusAdapter() {
                 override fun focusGained(event: FocusEvent) = activate(this@TextAreaAdapter)
 

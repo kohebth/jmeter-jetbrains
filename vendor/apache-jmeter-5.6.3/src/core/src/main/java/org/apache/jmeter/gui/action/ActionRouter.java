@@ -64,7 +64,18 @@ public final class ActionRouter implements ActionListener {
 
     @Override
     public void actionPerformed(final ActionEvent e) {
-        SwingUtilities.invokeLater(() -> performAction(e));
+        SwingUtilities.invokeLater(() -> performWithRuntimeClassLoader(e));
+    }
+
+    private void performWithRuntimeClassLoader(ActionEvent event) {
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        thread.setContextClassLoader(ActionRouter.class.getClassLoader());
+        try {
+            performAction(event);
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
     }
 
     private void performAction(final ActionEvent e) {

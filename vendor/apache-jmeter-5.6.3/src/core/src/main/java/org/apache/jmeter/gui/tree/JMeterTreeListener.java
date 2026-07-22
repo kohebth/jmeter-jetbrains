@@ -181,7 +181,7 @@ public class JMeterTreeListener implements TreeSelectionListener, MouseListener,
         }
         currentPath = closestPath;
         if (isRightClick(e)) {
-            if (tree.getSelectionCount() < 2) {
+            if (!tree.isPathSelected(currentPath)) {
                 tree.setSelectionPath(currentPath);
             }
             log.debug("About to display pop-up");

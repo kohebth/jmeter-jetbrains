@@ -6,6 +6,6 @@ package com.github.kohebth.jmeterviewer.editor
  */
 internal object JMeterEditorFeatures {
     const val JETBRAINS_MULTILINE_EDITOR_ENABLED = false
-    const val VISUAL_UNDO_ENABLED = false
+    const val JETBRAINS_VISUAL_UNDO_ENABLED = false
     const val SEARCH_VISIBLE_ON_MOUNT = false
 }

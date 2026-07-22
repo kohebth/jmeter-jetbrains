@@ -2,7 +2,10 @@ package com.github.kohebth.jmeterviewer.runtime
 
 import com.github.kohebth.jmeterviewer.execution.JMeterResultBridge
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -11,6 +14,9 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.assertThrows
 import java.awt.Component
 import java.awt.Container
+import java.awt.event.ActionEvent
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -22,7 +28,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JComponent
+import javax.swing.JMenu
+import javax.swing.JMenuItem
+import javax.swing.JPopupMenu
+import javax.swing.JTextArea
 import javax.swing.JTree
+import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
 import javax.swing.UIManager
 import javax.swing.text.JTextComponent
@@ -42,6 +53,127 @@ class JMeterSwingClassLoaderTest {
             )
             assertThrows<ClassNotFoundException> {
                 runtime.classLoader.loadClass(JMeterSwingClassLoaderTest::class.java.name)
+            }
+        }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "JMETER_GUI_SMOKE", matches = "true")
+    fun keepsTwoWorkspacesIsolatedAndPastesAnOrderedMultiNodeForestAcrossClassloaders() {
+        openRuntime().use { firstRuntime ->
+            openRuntime().use { secondRuntime ->
+                withHostTreeUi {
+                    val first = onEdt(firstRuntime::createWorkspace)
+                    val second = onEdt(secondRuntime::createWorkspace)
+                    try {
+                        val fixture = resourcePath(COMPLEX_PLAN_RESOURCE)
+                        onEdt {
+                            Files.newInputStream(fixture).use { first.load(it, fixture) }
+                            Files.newInputStream(fixture).use { second.load(it, fixture) }
+
+                            val sourceNodes = listOf("Health Request", "Metrics Request").map { name ->
+                                first.searchTestPlan(name, true, false).single { it.name == name }.path
+                            }
+                            descendants<JTree>(first.outlineComponent).single().selectionPaths =
+                                sourceNodes.toTypedArray()
+                            val fragment = first.exportSelectedNodes()
+                            assertNotNull(fragment)
+                            first.performAction("Copy")
+
+                            val destination = second.searchTestPlan(
+                                "02 Catalog Thread Group",
+                                true,
+                                false,
+                            ).single { it.name == "02 Catalog Thread Group" }.path
+                            descendants<JTree>(second.outlineComponent).single().selectionPath = destination
+
+                            second.performAction("Paste")
+                            val destinationTree = descendants<JTree>(second.outlineComponent).single()
+                            val destinationNode = destination.lastPathComponent
+                            val destinationChildren = (0 until destinationTree.model.getChildCount(destinationNode))
+                                .map { index ->
+                                    val child = destinationTree.model.getChild(destinationNode, index)
+                                    secondRuntime.withContextClassLoader {
+                                        secondRuntime.invoke(
+                                            child.javaClass.getMethod("getName"),
+                                            child,
+                                        ) as String
+                                    }
+                                }
+                            assertEquals(
+                                listOf("Health Request", "Metrics Request"),
+                                destinationChildren.takeLast(2),
+                                "Portable multi-node paste did not preserve tree order",
+                            )
+                            assertEquals(
+                                2,
+                                second.searchTestPlan("Health Request", true, false)
+                                    .count { it.name == "Health Request" },
+                            )
+                            assertEquals(
+                                2,
+                                second.searchTestPlan("Metrics Request", true, false)
+                                    .count { it.name == "Metrics Request" },
+                            )
+
+                            val threadGroup = first.searchTestPlan(
+                                "01 Authentication Thread Group",
+                                true,
+                                false,
+                            ).single { it.name == "01 Authentication Thread Group" }.path
+                            descendants<JTree>(first.outlineComponent).single().selectionPath = threadGroup
+                            val incompatibleFragment = checkNotNull(first.exportSelectedNodes())
+                            val samplerDestination = second.searchTestPlan(
+                                "Health Request",
+                                true,
+                                false,
+                            ).first { it.name == "Health Request" }.path
+                            descendants<JTree>(second.outlineComponent).single().selectionPath =
+                                samplerDestination
+                            val beforeRejectedPaste = second.snapshot()
+                            assertNotNull(
+                                runCatching { second.importNodes(incompatibleFragment) }.exceptionOrNull(),
+                                "Pasting a Thread Group below a sampler should be rejected",
+                            )
+                            assertArrayEquals(beforeRejectedPaste, second.snapshot())
+
+                            descendants<JTree>(second.outlineComponent).single().selectionPath = destination
+
+                            val currentNode = destination.lastPathComponent
+                            val popup = secondRuntime.withContextClassLoader {
+                                secondRuntime.invoke(
+                                    currentNode.javaClass.getMethod("createPopupMenu"),
+                                    currentNode,
+                                ) as JPopupMenu
+                            }
+                            val externalSampler = menuItems(popup).singleOrNull { item ->
+                                item.name == "com.github.kohebth.jmeterviewer.testplugin.ExternalSampler" &&
+                                    item.actionCommand == "Add"
+                            }
+                            assertNotNull(
+                                externalSampler,
+                                "Native context menu did not expose the external sampler",
+                            )
+                            externalSampler?.doClick(0)
+                        }
+                        onEdt { Unit }
+                        val contextMenuSnapshot = String(
+                            onEdt(second::snapshot),
+                            StandardCharsets.UTF_8,
+                        )
+                        assertTrue(
+                            contextMenuSnapshot.contains(
+                                "com.github.kohebth.jmeterviewer.testplugin.ExternalSampler",
+                            ),
+                            "Clicking the native context-menu item did not add the external sampler:\n" +
+                                contextMenuSnapshot,
+                        )
+                        assertNotSame(firstRuntime.classLoader, secondRuntime.classLoader)
+                    } finally {
+                        onEdt(first::close)
+                        onEdt(second::close)
+                    }
+                }
             }
         }
     }
@@ -72,6 +204,7 @@ class JMeterSwingClassLoaderTest {
                         assertComplexPlan(workspace)
                         tree
                     }
+                    assertNativeTextUndo(workspace)
 
                     JMeterLocalhostServer().use { server ->
                         val journal = tempDirectory.resolve("restricted-results.journal")
@@ -243,6 +376,62 @@ class JMeterSwingClassLoaderTest {
         assertTrue(product.breadcrumb.contains("Browse Catalog Transaction"))
     }
 
+    private fun assertNativeTextUndo(workspace: JMeterWorkspace) {
+        val scriptPath = onEdt {
+            workspace.searchTestPlan(
+                "Build Login Correlation ID",
+                caseSensitive = true,
+                regexp = false,
+            ).single { it.name == "Build Login Correlation ID" }.path
+        }
+        onEdt { workspace.selectSearchResult(scriptPath) }
+        onEdt { assertNativeTextUndo(workspace.component) }
+    }
+
+    private fun assertNativeTextUndo(component: JComponent) {
+        val shortcutMask = if (
+            System.getProperty("os.name").contains("mac", ignoreCase = true)
+        ) {
+            InputEvent.META_DOWN_MASK
+        } else {
+            InputEvent.CTRL_DOWN_MASK
+        }
+        val undoShortcut = KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask)
+        val multilineFields = descendants<JTextArea>(component)
+        val fieldAndAction = multilineFields
+            .firstNotNullOfOrNull { candidate ->
+                if (!candidate.isEditable || !candidate.isVisible) {
+                    return@firstNotNullOfOrNull null
+                }
+                val actionKey = candidate.inputMap.get(undoShortcut)
+                    ?: return@firstNotNullOfOrNull null
+                val action = candidate.actionMap.get(actionKey)
+                    ?: return@firstNotNullOfOrNull null
+                candidate to action
+            }
+        val diagnostics = multilineFields.joinToString("\n") { candidate ->
+            val actionKey = candidate.inputMap.get(undoShortcut)
+            "${candidate.javaClass.name}: editable=${candidate.isEditable}, " +
+                "visible=${candidate.isVisible}, binding=$actionKey, " +
+                "action=${actionKey?.let(candidate.actionMap::get)}"
+        }
+        assertNotNull(
+            fieldAndAction,
+            "Expected JMeter multiline fields to retain Ctrl/Cmd+Z:\n$diagnostics",
+        )
+        val (nativeField, undoAction) = checkNotNull(fieldAndAction)
+        val originalText = nativeField.text
+        val suffix = "native-undo-probe"
+
+        nativeField.document.insertString(nativeField.document.length, suffix, null)
+        assertEquals(originalText + suffix, nativeField.text)
+        undoAction.actionPerformed(
+            ActionEvent(nativeField, ActionEvent.ACTION_PERFORMED, "undo"),
+        )
+
+        assertEquals(originalText, nativeField.text)
+    }
+
     private fun assertRestrictedListener(restrictedJmx: ByteArray) {
         val restrictedXml = String(restrictedJmx, StandardCharsets.UTF_8)
         val bridgeTags = restrictedXml.lineSequence()
@@ -410,6 +599,17 @@ class JMeterSwingClassLoaderTest {
             }
         }
         return matches
+    }
+
+    private fun menuItems(menu: JPopupMenu): List<JMenuItem> = buildList {
+        fun collect(component: Component) {
+            if (component is JMenu) {
+                component.menuComponents.forEach(::collect)
+            } else if (component is JMenuItem) {
+                add(component)
+            }
+        }
+        menu.components.forEach(::collect)
     }
 
     private fun resourcePath(resource: String): Path =

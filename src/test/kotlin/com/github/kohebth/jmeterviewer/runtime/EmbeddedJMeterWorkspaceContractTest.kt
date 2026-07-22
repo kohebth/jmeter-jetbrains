@@ -89,6 +89,19 @@ class EmbeddedJMeterWorkspaceContractTest {
                 api.getMethod("setExecutionActionListener", ActionListener::class.java).returnType,
             )
             assertEquals(
+                List::class.java,
+                api.getMethod("getShortcutDescriptors").returnType,
+            )
+            assertEquals(
+                Void.TYPE,
+                api.getMethod("performAction", String::class.java, String::class.java).returnType,
+            )
+            assertEquals(ByteArray::class.java, api.getMethod("exportSelectedNodes").returnType)
+            assertEquals(
+                Int::class.javaPrimitiveType,
+                api.getMethod("importNodes", ByteArray::class.java).returnType,
+            )
+            assertEquals(
                 Boolean::class.javaPrimitiveType,
                 api.getMethod("canRunSelectedThreadGroups").returnType,
             )

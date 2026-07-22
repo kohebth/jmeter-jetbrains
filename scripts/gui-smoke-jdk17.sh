@@ -93,6 +93,6 @@ fi
 export JMETER_GUI_SMOKE=true
 cd "$PROJECT_DIR"
 ./gradlew test \
-    --tests '*JMeterSwingClassLoaderTest.opensAndReopensAComplexPlanWithHostLookAndFeelAndRecordedResults' \
+    --tests '*JMeterSwingClassLoaderTest' \
     "$@" \
     --console=plain

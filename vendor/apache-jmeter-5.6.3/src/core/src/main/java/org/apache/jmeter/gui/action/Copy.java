@@ -20,7 +20,11 @@ package org.apache.jmeter.gui.action;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.event.ActionEvent;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -31,9 +35,12 @@ import javax.swing.JOptionPane;
 import org.apache.jmeter.gui.GuiPackage;
 import org.apache.jmeter.gui.tree.JMeterTreeListener;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
+import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.util.JMeterTreeNodeTransferable;
 import org.apache.jmeter.util.JMeterUtils;
+import org.apache.jorphan.collections.HashTree;
+import org.apache.jorphan.collections.ListedHashTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,8 +70,7 @@ public class Copy extends AbstractAction {
     @Override
     public void doAction(ActionEvent e) {
         JMeterTreeListener treeListener = GuiPackage.getInstance().getTreeListener();
-        JMeterTreeNode[] nodes = treeListener.getSelectedNodes();
-        nodes = keepOnlyAncestors(nodes);
+        JMeterTreeNode[] nodes = orderedAncestors(treeListener.getSelectedNodes());
         nodes = cloneTreeNodes(nodes);
         setCopiedNodes(nodes);
     }
@@ -96,7 +102,7 @@ public class Copy extends AbstractAction {
      * @param currentNodes JMeterTreeNode[]
      * @return JMeterTreeNode[]
      */
-    static JMeterTreeNode[] keepOnlyAncestors(JMeterTreeNode[] currentNodes) {
+    public static JMeterTreeNode[] keepOnlyAncestors(JMeterTreeNode[] currentNodes) {
         List<JMeterTreeNode> nodes = new ArrayList<>();
         for (int i = 0; i < currentNodes.length; i++) {
             boolean exclude = false;
@@ -115,17 +121,50 @@ public class Copy extends AbstractAction {
         return nodes.toArray(new JMeterTreeNode[nodes.size()]);
     }
 
+    public static JMeterTreeNode[] orderedAncestors(JMeterTreeNode[] currentNodes) {
+        JMeterTreeNode[] nodes = keepOnlyAncestors(currentNodes);
+        javax.swing.JTree tree = GuiPackage.getInstance().getMainFrame().getTree();
+        Arrays.sort(nodes, Comparator.comparingInt(node ->
+                tree.getRowForPath(new javax.swing.tree.TreePath(node.getPath()))));
+        return nodes;
+    }
+
     public static void setCopiedNodes(JMeterTreeNode[] nodes) {
         Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
         try {
             JMeterTreeNodeTransferable transferable = new JMeterTreeNodeTransferable();
-            transferable.setTransferData(nodes);
+            transferable.setTransferData(nodes, createPortableFragment(nodes));
             clipboard.setContents(transferable, null);
         } catch (Exception ex) {
             log.error("Clipboard node read error: {}", ex.getMessage(), ex);
             JOptionPane.showMessageDialog(GuiPackage.getInstance().getDialogParent(),
                     JMeterUtils.getResString("clipboard_node_read_error")+":\n" + ex.getLocalizedMessage(), //$NON-NLS-1$ //$NON-NLS-2$
                     JMeterUtils.getResString("error_title"), JOptionPane.ERROR_MESSAGE); //$NON-NLS-1$
+        }
+    }
+
+    public static byte[] createPortableFragment(JMeterTreeNode[] nodes) throws IOException {
+        HashTree forest = new ListedHashTree();
+        for (JMeterTreeNode node : nodes) {
+            forest.add(GuiPackage.getInstance().getTreeModel().getCurrentSubTree(node));
+        }
+        return serializeTree(forest);
+    }
+
+    public static byte[] serializeTree(HashTree tree) throws IOException {
+        convertTreeNodes(tree);
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            SaveService.saveTree(tree, output);
+            return output.toByteArray();
+        }
+    }
+
+    private static void convertTreeNodes(HashTree tree) {
+        for (Object key : new ArrayList<>(tree.list())) {
+            convertTreeNodes(tree.getTree(key));
+            if (key instanceof JMeterTreeNode) {
+                tree.replaceKey(key, ((JMeterTreeNode) key).getTestElement());
+            }
         }
     }
 

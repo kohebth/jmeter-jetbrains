@@ -751,8 +751,10 @@ public final class GuiPackage implements LocaleChangeListener, HistoryListener {
         if (popup != null) {
             log.debug("Showing pop up for {} at x,y = {},{}", invoker, e.getX(), e.getY());
 
-            // Enforce heavyweight popup to show shadows on macOS
-            popup.setLightWeightPopupEnabled(false);
+            // Lightweight popups remain inside the host IDE's layered pane and keep
+            // nested Add menus clickable. Standalone JMeter retains its native popup.
+            popup.setLightWeightPopupEnabled(
+                    mainFrame != null && mainFrame.isEmbeddedMode());
             popup.show(invoker, e.getX(), e.getY());
         }
     }

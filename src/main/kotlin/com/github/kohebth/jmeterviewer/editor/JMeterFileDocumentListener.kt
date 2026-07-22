@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 class JMeterFileDocumentListener : FileDocumentManagerListener {
     override fun fileContentReloaded(file: VirtualFile, document: Document) {
         ApplicationManager.getApplication()
-            .getServiceIfCreated(JMeterWorkspaceService::class.java)
+            .getServiceIfCreated(JMeterDocumentSessionRegistry::class.java)
             ?.fileContentReloaded(file, document)
     }
 }

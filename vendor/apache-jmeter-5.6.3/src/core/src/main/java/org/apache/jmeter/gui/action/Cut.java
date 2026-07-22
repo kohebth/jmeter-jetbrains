@@ -54,7 +54,7 @@ public class Cut extends AbstractAction {
         ActionRouter.getInstance().actionPerformed(new ActionEvent(e.getSource(), e.getID(), ActionNames.CHECK_CUT));
         JMeterTreeNode[] currentNodes = guiPack.getTreeListener().getSelectedNodes();
 
-        currentNodes = Copy.keepOnlyAncestors(currentNodes);
+        currentNodes = Copy.orderedAncestors(currentNodes);
         Copy.setCopiedNodes(currentNodes);
         for (JMeterTreeNode currentNode : currentNodes) {
             guiPack.getTreeModel().removeNodeFromParent(currentNode);

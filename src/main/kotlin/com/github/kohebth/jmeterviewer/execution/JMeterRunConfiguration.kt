@@ -30,7 +30,7 @@ import javax.swing.JPanel
 class JMeterRunConfigurationType : ConfigurationTypeBase(
     ID,
     "JMeter Selected Thread Groups",
-    "Run the selected thread groups from the active JMeter visual editor",
+    "Run selected thread groups from one JMeter visual editor session",
     JMeterFileType.icon,
 ) {
     init {
@@ -55,6 +55,7 @@ class JMeterRunConfiguration(
     name: String,
 ) : RunConfigurationBase<RunConfigurationOptions>(project, factory, name) {
     internal var runMode: JMeterRunMode = JMeterRunMode.AS_IS
+    internal var targetFileUrl: String = ""
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> =
         JMeterRunSettingsEditor()
@@ -68,25 +69,33 @@ class JMeterRunConfiguration(
                 "Configure Apache JMeter under Settings | Tools | JMeter before running.",
             )
         }
+        if (targetFileUrl.isBlank()) {
+            throw RuntimeConfigurationError(
+                "Start this configuration from a JMX tree's native context menu.",
+            )
+        }
     }
 
     override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
-        JMeterCommandLineState(environment, runMode)
+        JMeterCommandLineState(environment, targetFileUrl, runMode)
 
     override fun readExternal(element: Element) {
         super.readExternal(element)
         runMode = element.getAttributeValue(MODE_ATTRIBUTE)
             ?.let { stored -> JMeterRunMode.values().firstOrNull { it.name == stored } }
             ?: JMeterRunMode.AS_IS
+        targetFileUrl = element.getAttributeValue(TARGET_FILE_ATTRIBUTE).orEmpty()
     }
 
     override fun writeExternal(element: Element) {
         super.writeExternal(element)
         element.setAttribute(MODE_ATTRIBUTE, runMode.name)
+        element.setAttribute(TARGET_FILE_ATTRIBUTE, targetFileUrl)
     }
 
     private companion object {
         const val MODE_ATTRIBUTE = "jmeterRunMode"
+        const val TARGET_FILE_ATTRIBUTE = "jmeterTargetFileUrl"
     }
 }
 
@@ -110,6 +119,7 @@ private class JMeterRunSettingsEditor : SettingsEditor<JMeterRunConfiguration>()
 
 private class JMeterCommandLineState(
     environment: ExecutionEnvironment,
+    private val targetFileUrl: String,
     private val mode: JMeterRunMode,
 ) : CommandLineState(environment) {
     init {
@@ -118,9 +128,9 @@ private class JMeterCommandLineState(
 
     @Throws(ExecutionException::class)
     override fun startProcess(): ProcessHandler {
-        val service = ApplicationManager.getApplication().getService(JMeterWorkspaceService::class.java)
+        val service = environment.project.getService(JMeterWorkspaceService::class.java)
         val request = try {
-            service.prepareExternalRun(environment.project, mode)
+            service.prepareExternalRun(targetFileUrl, mode)
         } catch (failure: Exception) {
             throw ExecutionException(failure.message ?: "Unable to prepare the JMeter run", failure)
         }

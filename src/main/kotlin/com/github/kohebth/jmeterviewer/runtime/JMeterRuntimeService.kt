@@ -10,34 +10,32 @@ import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.util.Locale
+import java.util.IdentityHashMap
 import java.util.stream.Collectors
 
 @Service(Service.Level.APP)
 class JMeterRuntimeService : Disposable {
-    @Volatile
-    private var runtime: JMeterRuntime? = null
-    // This application service is the sole owner of the shared native workspace.
-    private var workspace: JMeterWorkspace? = null
+    private val sessions = java.util.Collections.newSetFromMap(
+        IdentityHashMap<JMeterRuntimeSession, Boolean>(),
+    )
 
     @Synchronized
-    internal fun createWorkspace(): JMeterWorkspace {
+    internal fun openSession(): JMeterRuntimeSession {
         val installation = configuredInstallation()
-        runtime?.let { active ->
-            if (active.installation.home != installation.home) {
-                throw JMeterConfigurationException(
-                    "The JMeter home changed from ${active.installation.home} to ${installation.home}. " +
-                        "Restart the IDE before loading another JMeter installation.",
-                )
-            }
-            return workspace ?: active.createWorkspace().also { workspace = it }
+        val activeHome = sessions.firstOrNull()?.installationHome
+        if (activeHome != null && activeHome != installation.home) {
+            throw JMeterConfigurationException(
+                "The JMeter home changed from $activeHome to ${installation.home}. " +
+                    "Restart the IDE before loading another JMeter installation.",
+            )
         }
 
         val opened = JMeterRuntime.open(installation, locateBridge())
         return try {
-            opened.createWorkspace().also {
-                runtime = opened
-                workspace = it
-            }
+            val workspace = opened.createWorkspace()
+            JMeterRuntimeSession(opened, workspace) { closed ->
+                synchronized(this) { sessions.remove(closed) }
+            }.also(sessions::add)
         } catch (failure: Throwable) {
             try {
                 opened.close()
@@ -49,7 +47,9 @@ class JMeterRuntimeService : Disposable {
     }
 
     internal fun requiresRestart(configuredHome: String): Boolean {
-        val activeHome = runtime?.installation?.home ?: return false
+        val activeHome = synchronized(this) {
+            sessions.firstOrNull()?.installationHome
+        } ?: return false
         if (configuredHome.isBlank()) {
             return true
         }
@@ -113,25 +113,58 @@ class JMeterRuntimeService : Disposable {
 
     @Synchronized
     override fun dispose() {
-        try {
-            workspace?.close()
-        } catch (closeFailure: Throwable) {
-            LOG.warn("Unable to close the embedded JMeter workspace", closeFailure)
-        } finally {
-            workspace = null
+        sessions.toList().forEach { session ->
+            try {
+                session.close()
+            } catch (closeFailure: Throwable) {
+                LOG.warn("Unable to close an embedded JMeter runtime session", closeFailure)
+            }
         }
-        try {
-            runtime?.close()
-        } catch (closeFailure: Throwable) {
-            LOG.warn("Unable to close the embedded JMeter runtime", closeFailure)
-        } finally {
-            runtime = null
-        }
+        sessions.clear()
     }
 
     private companion object {
         const val BRIDGE_DIRECTORY = "jmeter-bridge"
         val LOG: Logger = Logger.getInstance(JMeterRuntimeService::class.java)
         val PLUGIN_ID: PluginId = PluginId.getId("com.github.kohebth.jmeterviewer")
+    }
+}
+
+internal class JMeterRuntimeSession(
+    private val runtime: JMeterRuntime,
+    val workspace: JMeterWorkspace,
+    private val onClosed: (JMeterRuntimeSession) -> Unit,
+) : AutoCloseable {
+    val installationHome: Path
+        get() = runtime.installation.home
+
+    @Volatile
+    private var closed = false
+
+    @Synchronized
+    override fun close() {
+        if (closed) {
+            return
+        }
+        closed = true
+        var failure: Throwable? = null
+        try {
+            val application = ApplicationManager.getApplication()
+            if (application.isDispatchThread) {
+                workspace.close()
+            } else {
+                application.invokeAndWait { workspace.close() }
+            }
+        } catch (caught: Throwable) {
+            failure = caught
+        }
+        try {
+            runtime.close()
+        } catch (closeFailure: Throwable) {
+            if (failure == null) failure = closeFailure else failure.addSuppressed(closeFailure)
+        } finally {
+            onClosed(this)
+        }
+        failure?.let { throw it }
     }
 }

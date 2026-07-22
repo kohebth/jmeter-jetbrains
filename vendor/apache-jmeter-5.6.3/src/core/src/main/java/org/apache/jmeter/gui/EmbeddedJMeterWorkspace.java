@@ -21,6 +21,8 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,22 +39,30 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JTree;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
+import javax.swing.undo.UndoManager;
 
 import org.apache.jmeter.exceptions.IllegalUserActionException;
 import org.apache.jmeter.gui.action.ActionNames;
 import org.apache.jmeter.gui.action.ActionRouter;
 import org.apache.jmeter.gui.action.CheckDirty;
+import org.apache.jmeter.gui.action.Copy;
+import org.apache.jmeter.gui.action.KeyStrokes;
 import org.apache.jmeter.gui.action.Load;
+import org.apache.jmeter.gui.action.Paste;
 import org.apache.jmeter.gui.action.RawTextSearcher;
 import org.apache.jmeter.gui.action.RegexpSearcher;
 import org.apache.jmeter.gui.action.Searcher;
@@ -60,7 +70,6 @@ import org.apache.jmeter.gui.action.Start;
 import org.apache.jmeter.gui.tree.JMeterTreeListener;
 import org.apache.jmeter.gui.tree.JMeterTreeModel;
 import org.apache.jmeter.gui.tree.JMeterTreeNode;
-import org.apache.jmeter.gui.util.JSyntaxTextArea;
 import org.apache.jmeter.samplers.Clearable;
 import org.apache.jmeter.reporters.ResultCollector;
 import org.apache.jmeter.reporters.ResultCollectorHelper;
@@ -70,7 +79,6 @@ import org.apache.jmeter.testbeans.gui.TestBeanGUI;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.visualizers.Visualizer;
 import org.apache.jorphan.collections.HashTree;
-import org.apache.jorphan.gui.ui.TextComponentUI;
 import org.apiguardian.api.API;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,8 +89,8 @@ import org.slf4j.LoggerFactory;
  * <p>The workspace deliberately owns one normal {@link GuiPackage}, action
  * router, tree model, tree listener, and hidden {@link MainFrame}. This keeps
  * JMeter's native menus, context actions, shortcuts, and GUI component
- * lifecycle intact while allowing another Swing application to own the
- * visible window, document persistence, and undo history.</p>
+ * lifecycle and native field undo intact while allowing another Swing
+ * application to own the visible window and document persistence.</p>
  */
 @API(since = "5.6.3", status = API.Status.EXPERIMENTAL)
 public final class EmbeddedJMeterWorkspace implements AutoCloseable {
@@ -91,6 +99,12 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
     private static final String JSR223_SCRIPT_LANGUAGE = "scriptLanguage";
     private static final String JSR223_CACHE_KEY = "cacheKey";
     private static final String JSR223_SCRIPT = "script";
+    private static final String NATIVE_TEXT_UNDO_MANAGER_PROPERTY =
+            "jmeter.intellij.native.text.undo.manager";
+    private static final int TEXT_UNDO_SHORTCUT_MASK =
+            System.getProperty("os.name", "").toLowerCase(Locale.ENGLISH).contains("mac")
+                    ? InputEvent.META_DOWN_MASK
+                    : InputEvent.CTRL_DOWN_MASK;
     public static final String RUN_SELECTED_THREAD_GROUPS = "jmeter.run.selected.thread.groups";
     public static final String SHUTDOWN_TEST = "jmeter.shutdown.test";
     public static final String STOP_TEST = "jmeter.stop.test";
@@ -117,11 +131,11 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         this.startCommand = startCommand;
         this.embeddedComponent = mainFrame.getEmbeddedComponent();
         this.outlineComponent = mainFrame.getEmbeddedTreeComponent();
-        disablePerTextUndo(this.embeddedComponent);
+        ensureNativeTextUndo(this.embeddedComponent);
     }
 
     /**
-     * Create the application-wide native JMeter authoring session.
+     * Create one native JMeter authoring session in the current isolated class loader.
      *
      * @return initialized workspace
      */
@@ -160,7 +174,7 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
                     event -> {
                         Object currentGui = workspace.guiPackage.getCurrentGui();
                         if (currentGui instanceof JComponent) {
-                            disablePerTextUndo((JComponent) currentGui);
+                            ensureNativeTextUndo((JComponent) currentGui);
                         }
                         workspace.modelChangeListener.run();
                     });
@@ -383,6 +397,107 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
     public void setExecutionActionListener(ActionListener listener) {
         ensureOpen();
         startCommand.setSelectedThreadGroupRunListener(listener);
+    }
+
+    /**
+     * Return JMeter's embedded-safe shortcut descriptors using bootstrap values.
+     * Standalone file/window commands, remote execution, and look-and-feel changes
+     * are intentionally not exposed to the host IDE.
+     */
+    public List<Map<String, Object>> getShortcutDescriptors() {
+        ensureOpen();
+        List<Map<String, Object>> shortcuts = new ArrayList<>();
+        addShortcut(shortcuts, KeyStrokes.COPY, ActionNames.COPY, null);
+        addShortcut(shortcuts, KeyStrokes.CUT, ActionNames.CUT, null);
+        addShortcut(shortcuts, KeyStrokes.PASTE, ActionNames.PASTE, null);
+        addShortcut(shortcuts, KeyStrokes.DUPLICATE, ActionNames.DUPLICATE, null);
+        addShortcut(shortcuts, KeyStrokes.REMOVE, ActionNames.REMOVE, null);
+        addShortcut(shortcuts, KeyStrokes.TOGGLE, ActionNames.TOGGLE, null);
+        addShortcut(shortcuts, KeyStrokes.ALT_UP_ARROW, ActionNames.MOVE_UP, null);
+        addShortcut(shortcuts, KeyStrokes.ALT_DOWN_ARROW, ActionNames.MOVE_DOWN, null);
+        addShortcut(shortcuts, KeyStrokes.ALT_LEFT_ARROW, ActionNames.MOVE_LEFT, null);
+        addShortcut(shortcuts, KeyStrokes.ALT_RIGHT_ARROW, ActionNames.MOVE_RIGHT, null);
+        addShortcut(shortcuts, KeyStrokes.SHIFT_LEFT_ARROW, ActionNames.COLLAPSE, null);
+        addShortcut(shortcuts, KeyStrokes.SHIFT_RIGHT_ARROW, ActionNames.EXPAND, null);
+        addShortcut(shortcuts, KeyStrokes.COLLAPSE_ALL, ActionNames.COLLAPSE_ALL, null);
+        addShortcut(shortcuts, KeyStrokes.COLLAPSE_ALL_SUBTRACT, ActionNames.COLLAPSE_ALL, null);
+        addShortcut(shortcuts, KeyStrokes.EXPAND_ALL, ActionNames.EXPAND_ALL, null);
+        addShortcut(shortcuts, KeyStrokes.EXPAND_ALL_SUBTRACT, ActionNames.EXPAND_ALL, null);
+        addShortcut(shortcuts, KeyStrokes.SAVE, ActionNames.SAVE, null);
+        addShortcut(shortcuts, KeyStrokes.SEARCH_TREE, ActionNames.SEARCH_TREE, null);
+        addShortcut(shortcuts, KeyStrokes.RESET_SEARCH_TREE, ActionNames.SEARCH_RESET, null);
+        addShortcut(shortcuts, KeyStrokes.ACTION_START, ActionNames.RUN_TG, null);
+        addShortcut(shortcuts, KeyStrokes.ACTION_START_NO_PAUSE, ActionNames.RUN_TG_NO_TIMERS, null);
+        addShortcut(shortcuts, KeyStrokes.ACTION_SHUTDOWN, ActionNames.ACTION_SHUTDOWN, null);
+        addShortcut(shortcuts, KeyStrokes.ACTION_STOP, ActionNames.ACTION_STOP, null);
+        addShortcut(shortcuts, KeyStrokes.DEBUG_OFF, ActionNames.DEBUG_OFF, null);
+        addShortcut(shortcuts, KeyStrokes.DEBUG_ON, ActionNames.DEBUG_ON, null);
+        addShortcut(shortcuts, KeyStrokes.SAVE_GRAPHICS, ActionNames.SAVE_GRAPHICS, null);
+        addShortcut(shortcuts, KeyStrokes.SAVE_GRAPHICS_ALL, ActionNames.SAVE_GRAPHICS_ALL, null);
+        addShortcut(shortcuts, KeyStrokes.HELP, ActionNames.HELP, null);
+        addShortcut(shortcuts, KeyStrokes.WHAT_CLASS, ActionNames.WHAT_CLASS, null);
+        addShortcut(shortcuts, KeyStrokes.FUNCTIONS, ActionNames.FUNCTIONS, null);
+        addShortcut(shortcuts, KeyStrokes.CLEAR, ActionNames.CLEAR, null);
+        addShortcut(shortcuts, KeyStrokes.CLEAR_ALL, ActionNames.CLEAR_ALL, null);
+        KeyStroke[] quickKeys = new KeyStroke[] {
+                KeyStrokes.CTRL_0, KeyStrokes.CTRL_1, KeyStrokes.CTRL_2,
+                KeyStrokes.CTRL_3, KeyStrokes.CTRL_4, KeyStrokes.CTRL_5,
+                KeyStrokes.CTRL_6, KeyStrokes.CTRL_7, KeyStrokes.CTRL_8,
+                KeyStrokes.CTRL_9
+        };
+        for (int index = 0; index < quickKeys.length; index++) {
+            addShortcut(shortcuts, quickKeys[index], ActionNames.QUICK_COMPONENT,
+                    Integer.toString(index));
+        }
+        return Collections.unmodifiableList(shortcuts);
+    }
+
+    /** Execute one embedded-safe native command in this workspace. */
+    public void performAction(String actionCommand, String argument) {
+        requireEventDispatchThread();
+        ensureOpen();
+        Objects.requireNonNull(actionCommand, "actionCommand");
+        if (ActionNames.QUICK_COMPONENT.equals(actionCommand)) {
+            String slot = Objects.requireNonNull(argument, "quick component slot");
+            javax.swing.Action action = mainFrame.getTree().getActionMap().get(
+                    ActionNames.QUICK_COMPONENT + slot);
+            if (action == null) {
+                throw new IllegalArgumentException("Unknown quick component slot: " + slot);
+            }
+            action.actionPerformed(new ActionEvent(
+                    mainFrame.getTree(), EMBEDDED_ACTION_ID, slot));
+            modelChangeListener.run();
+            return;
+        }
+        if (!isEmbeddedSafeAction(actionCommand)) {
+            throw new IllegalArgumentException(
+                    "JMeter action is not available in an embedded editor: " + actionCommand);
+        }
+        ActionRouter.getInstance().doActionNow(event(actionCommand));
+    }
+
+    /** Serialize the selected top-level forest for cross-workspace clipboard transfer. */
+    public byte[] exportSelectedNodes() throws IOException {
+        requireEventDispatchThread();
+        ensureOpen();
+        notifyIfModelChanged();
+        JMeterTreeNode[] selected = Copy.orderedAncestors(
+                guiPackage.getTreeListener().getSelectedNodes());
+        if (selected.length == 0) {
+            return null;
+        }
+        return Copy.createPortableFragment(selected);
+    }
+
+    /** Import an ordered portable JMX forest under the current native selection. */
+    public int importNodes(byte[] portableJmx) throws IOException, IllegalUserActionException {
+        requireEventDispatchThread();
+        ensureOpen();
+        int imported = Paste.importNodes(portableJmx);
+        if (imported > 0) {
+            modelChangeListener.run();
+        }
+        return imported;
     }
 
     /** @return whether the native selection contains runnable thread groups. */
@@ -716,25 +831,76 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         }
     }
 
-    private static void disablePerTextUndo(Component component) {
+    private static void ensureNativeTextUndo(Component component) {
         if (component instanceof JTextComponent) {
             JTextComponent textComponent = (JTextComponent) component;
-            if (Boolean.TRUE.equals(textComponent.getClientProperty(TEXT_UNDO_DISABLED_PROPERTY))) {
-                return;
-            }
-            textComponent.putClientProperty(TEXT_UNDO_DISABLED_PROPERTY, Boolean.TRUE);
-            TextComponentUI.uninstallUndo(textComponent);
-            textComponent.getActionMap().remove("undo");
-            textComponent.getActionMap().remove("redo");
-            if (textComponent instanceof JSyntaxTextArea) {
-                ((JSyntaxTextArea) textComponent).discardAllEdits();
+            KeyStroke shortcut = KeyStroke.getKeyStroke(KeyEvent.VK_Z, TEXT_UNDO_SHORTCUT_MASK);
+            Object actionKey = textComponent.getInputMap().get(shortcut);
+            if (textComponent.isEditable()
+                    && (actionKey == null || textComponent.getActionMap().get(actionKey) == null)) {
+                installNativeTextUndo(textComponent);
+            } else {
+                Object manager = textComponent.getClientProperty(NATIVE_TEXT_UNDO_MANAGER_PROPERTY);
+                if (manager instanceof UndoManager) {
+                    ((UndoManager) manager).discardAllEdits();
+                }
             }
         }
         if (component instanceof Container) {
             for (Component child : ((Container) component).getComponents()) {
-                disablePerTextUndo(child);
+                ensureNativeTextUndo(child);
             }
         }
+    }
+
+    private static void installNativeTextUndo(JTextComponent textComponent) {
+        UndoManager manager = new UndoManager();
+        manager.setLimit(200);
+        Document document = textComponent.getDocument();
+        if (document != null) {
+            document.addUndoableEditListener(manager);
+        }
+        textComponent.addPropertyChangeListener(
+                "document",
+                event -> {
+                    manager.discardAllEdits();
+                    if (event.getOldValue() instanceof Document) {
+                        ((Document) event.getOldValue()).removeUndoableEditListener(manager);
+                    }
+                    if (event.getNewValue() instanceof Document) {
+                        ((Document) event.getNewValue()).addUndoableEditListener(manager);
+                    }
+                });
+        textComponent.putClientProperty(NATIVE_TEXT_UNDO_MANAGER_PROPERTY, manager);
+        textComponent.getActionMap().put(
+                "undo",
+                new AbstractAction() {
+                    @Override
+                    public void actionPerformed(ActionEvent event) {
+                        if (manager.canUndo()) {
+                            manager.undo();
+                        }
+                    }
+                });
+        textComponent.getActionMap().put(
+                "redo",
+                new AbstractAction() {
+                    @Override
+                    public void actionPerformed(ActionEvent event) {
+                        if (manager.canRedo()) {
+                            manager.redo();
+                        }
+                    }
+                });
+        textComponent.getInputMap().put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_Z, TEXT_UNDO_SHORTCUT_MASK),
+                "undo");
+        textComponent.getInputMap().put(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_Z,
+                        TEXT_UNDO_SHORTCUT_MASK | InputEvent.SHIFT_DOWN_MASK),
+                "redo");
+        manager.discardAllEdits();
     }
 
     private static TestElement createResultBridgeListener(
@@ -830,8 +996,6 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
             aggregateReport = createVisualizer(AGGREGATE_REPORT_CLASS);
             resultsVisualizer = (Visualizer) resultsTree;
             aggregateVisualizer = (Visualizer) aggregateReport;
-            disablePerTextUndo(resultsTree);
-            disablePerTextUndo(aggregateReport);
             resultCollector = createCollector(resultsTree);
             collectors = Arrays.asList(resultCollector, createCollector(aggregateReport));
         }
@@ -905,6 +1069,51 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         }
     }
 
+    private static void addShortcut(
+            List<Map<String, Object>> shortcuts,
+            KeyStroke keyStroke,
+            String command,
+            String argument) {
+        Map<String, Object> descriptor = new LinkedHashMap<>();
+        descriptor.put("keyCode", keyStroke.getKeyCode());
+        descriptor.put("modifiers", keyStroke.getModifiers());
+        descriptor.put("command", command);
+        descriptor.put("argument", argument);
+        shortcuts.add(Collections.unmodifiableMap(descriptor));
+    }
+
+    private static boolean isEmbeddedSafeAction(String command) {
+        return ActionNames.COPY.equals(command)
+                || ActionNames.CUT.equals(command)
+                || ActionNames.PASTE.equals(command)
+                || ActionNames.DUPLICATE.equals(command)
+                || ActionNames.REMOVE.equals(command)
+                || ActionNames.TOGGLE.equals(command)
+                || ActionNames.MOVE_UP.equals(command)
+                || ActionNames.MOVE_DOWN.equals(command)
+                || ActionNames.MOVE_LEFT.equals(command)
+                || ActionNames.MOVE_RIGHT.equals(command)
+                || ActionNames.COLLAPSE.equals(command)
+                || ActionNames.EXPAND.equals(command)
+                || ActionNames.COLLAPSE_ALL.equals(command)
+                || ActionNames.EXPAND_ALL.equals(command)
+                || ActionNames.SEARCH_RESET.equals(command)
+                || ActionNames.RUN_TG.equals(command)
+                || ActionNames.RUN_TG_NO_TIMERS.equals(command)
+                || ActionNames.VALIDATE_TG.equals(command)
+                || ActionNames.ACTION_SHUTDOWN.equals(command)
+                || ActionNames.ACTION_STOP.equals(command)
+                || ActionNames.SAVE_GRAPHICS.equals(command)
+                || ActionNames.SAVE_GRAPHICS_ALL.equals(command)
+                || ActionNames.HELP.equals(command)
+                || ActionNames.WHAT_CLASS.equals(command)
+                || ActionNames.FUNCTIONS.equals(command)
+                || ActionNames.CLEAR.equals(command)
+                || ActionNames.CLEAR_ALL.equals(command)
+                || ActionNames.DEBUG_OFF.equals(command)
+                || ActionNames.DEBUG_ON.equals(command);
+    }
+
     private ActionEvent event(String actionName) {
         return new ActionEvent(this, EMBEDDED_ACTION_ID, actionName);
     }
@@ -931,6 +1140,4 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         }
     }
 
-    private static final String TEXT_UNDO_DISABLED_PROPERTY =
-            "jmeter.intellij.text.undo.disabled";
 }

@@ -27,6 +27,8 @@
         <applicationService
                 serviceImplementation="com.github.kohebth.jmeterviewer.runtime.JMeterSettings"/>
         <applicationService
+                serviceImplementation="com.github.kohebth.jmeterviewer.editor.JMeterDocumentSessionRegistry"/>
+        <projectService
                 serviceImplementation="com.github.kohebth.jmeterviewer.editor.JMeterWorkspaceService"/>
         <projectService
                 serviceImplementation="com.github.kohebth.jmeterviewer.toolwindow.JMeterToolWindowController"/>

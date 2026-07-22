@@ -23,6 +23,7 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -36,25 +37,40 @@ import org.apache.jmeter.gui.tree.JMeterTreeNode;
 public class JMeterTreeNodeTransferable implements Transferable {
 
     public final static DataFlavor JMETER_TREE_NODE_ARRAY_DATA_FLAVOR = new DataFlavor(JMeterTreeNode[].class, JMeterTreeNode[].class.getName());
+    public static final DataFlavor JMETER_JMX_FRAGMENT_DATA_FLAVOR = new DataFlavor(
+            "application/x-jmeter-jmx-fragment;class=java.io.InputStream",
+            "JMeter JMX Fragment");
 
-    private final static DataFlavor[] DATA_FLAVORS = new DataFlavor[]{JMETER_TREE_NODE_ARRAY_DATA_FLAVOR};
+    private final static DataFlavor[] DATA_FLAVORS = new DataFlavor[]{
+            JMETER_JMX_FRAGMENT_DATA_FLAVOR,
+            JMETER_TREE_NODE_ARRAY_DATA_FLAVOR
+    };
 
     private byte[] data = null;
+    private byte[] jmxFragment = null;
 
     @Override
     public DataFlavor[] getTransferDataFlavors() {
-        return DATA_FLAVORS;
+        return DATA_FLAVORS.clone();
     }
 
     @Override
     public boolean isDataFlavorSupported(DataFlavor flavor) {
-        return flavor.match(JMETER_TREE_NODE_ARRAY_DATA_FLAVOR);
+        return flavor.match(JMETER_JMX_FRAGMENT_DATA_FLAVOR)
+                || flavor.match(JMETER_TREE_NODE_ARRAY_DATA_FLAVOR);
     }
 
     @Override
     public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
         if(!isDataFlavorSupported(flavor)) {
             throw new UnsupportedFlavorException(flavor);
+        }
+        if (flavor.match(JMETER_JMX_FRAGMENT_DATA_FLAVOR)) {
+            if (jmxFragment == null) {
+                return null;
+            }
+            InputStream input = new ByteArrayInputStream(jmxFragment);
+            return input;
         }
         if(data != null) {
             ObjectInput ois = null;
@@ -78,12 +94,17 @@ public class JMeterTreeNodeTransferable implements Transferable {
     }
 
     public void setTransferData(JMeterTreeNode[] nodes) throws IOException {
+        setTransferData(nodes, null);
+    }
+
+    public void setTransferData(JMeterTreeNode[] nodes, byte[] portableJmxFragment) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         ObjectOutputStream oos = null;
         try {
             oos = new ObjectOutputStream(bos);
             oos.writeObject(nodes);
             data = bos.toByteArray();
+            jmxFragment = portableJmxFragment == null ? null : portableJmxFragment.clone();
         } finally {
             if(oos != null) {
                 try {

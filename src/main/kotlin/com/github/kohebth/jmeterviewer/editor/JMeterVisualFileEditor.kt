@@ -43,8 +43,7 @@ class JMeterVisualFileEditor(
     private val languageFooter = JPanel(FlowLayout(FlowLayout.TRAILING, 8, 3))
     private val languageSelector = JComboBox<JMeterEditorLanguage>()
     private val reformatButton = JButton("Reformat")
-    private val workspaceService = ApplicationManager.getApplication()
-        .getService(JMeterWorkspaceService::class.java)
+    private val workspaceService = project.getService(JMeterWorkspaceService::class.java)
     private var languageContext: JMeterLanguageContext? = null
     private var updatingLanguageSelector = false
     private var lastModified = false

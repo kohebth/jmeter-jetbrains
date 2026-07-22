@@ -7,7 +7,7 @@ class JMeterEditorFeaturesTest {
     @Test
     fun unstableVisualFeaturesAreDisabledByDefault() {
         assertFalse(JMeterEditorFeatures.JETBRAINS_MULTILINE_EDITOR_ENABLED)
-        assertFalse(JMeterEditorFeatures.VISUAL_UNDO_ENABLED)
+        assertFalse(JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED)
         assertFalse(JMeterEditorFeatures.SEARCH_VISIBLE_ON_MOUNT)
     }
 }

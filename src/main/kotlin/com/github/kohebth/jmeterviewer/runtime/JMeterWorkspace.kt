@@ -21,6 +21,13 @@ internal data class JMeterReplaceResult(
     val skippedNodes: Int,
 )
 
+internal data class JMeterNativeShortcut(
+    val keyCode: Int,
+    val modifiers: Int,
+    val command: String,
+    val argument: String?,
+)
+
 internal interface JMeterWorkspace : AutoCloseable {
     val isClosed: Boolean
 
@@ -70,6 +77,14 @@ internal interface JMeterWorkspace : AutoCloseable {
     fun setModelChangeListener(listener: Runnable?)
 
     fun setExecutionActionListener(listener: ActionListener?)
+
+    val shortcutDescriptors: List<JMeterNativeShortcut>
+
+    fun performAction(command: String, argument: String? = null)
+
+    fun exportSelectedNodes(): ByteArray?
+
+    fun importNodes(portableJmx: ByteArray): Int
 
     val canRunSelectedThreadGroups: Boolean
 
@@ -152,6 +167,14 @@ internal class ReflectiveJMeterWorkspace(
         "setExecutionActionListener",
         ActionListener::class.java,
     )
+    private val getShortcutDescriptorsMethod = workspaceClass.getMethod("getShortcutDescriptors")
+    private val performActionMethod = workspaceClass.getMethod(
+        "performAction",
+        String::class.java,
+        String::class.java,
+    )
+    private val exportSelectedNodesMethod = workspaceClass.getMethod("exportSelectedNodes")
+    private val importNodesMethod = workspaceClass.getMethod("importNodes", ByteArray::class.java)
     private val canRunSelectedThreadGroupsMethod = workspaceClass.getMethod("canRunSelectedThreadGroups")
     private val startSelectedThreadGroupsMethod = workspaceClass.getMethod(
         "startSelectedThreadGroups",
@@ -280,6 +303,36 @@ internal class ReflectiveJMeterWorkspace(
     override fun setExecutionActionListener(listener: ActionListener?) {
         call(setExecutionActionListenerMethod, listener)
     }
+
+    override val shortcutDescriptors: List<JMeterNativeShortcut>
+        get() {
+            val descriptors = call(getShortcutDescriptorsMethod) as? List<*>
+                ?: throw JMeterRuntimeException("JMeter returned incompatible shortcut descriptors")
+            return descriptors.map { raw ->
+                val descriptor = raw as? Map<*, *>
+                    ?: throw JMeterRuntimeException("JMeter returned an incompatible shortcut descriptor")
+                JMeterNativeShortcut(
+                    keyCode = descriptor["keyCode"] as? Int
+                        ?: throw JMeterRuntimeException("A JMeter shortcut has no key code"),
+                    modifiers = descriptor["modifiers"] as? Int
+                        ?: throw JMeterRuntimeException("A JMeter shortcut has no modifiers"),
+                    command = descriptor["command"] as? String
+                        ?: throw JMeterRuntimeException("A JMeter shortcut has no command"),
+                    argument = descriptor["argument"] as? String,
+                )
+            }
+        }
+
+    override fun performAction(command: String, argument: String?) {
+        call(performActionMethod, command, argument)
+    }
+
+    override fun exportSelectedNodes(): ByteArray? =
+        call(exportSelectedNodesMethod) as? ByteArray
+
+    override fun importNodes(portableJmx: ByteArray): Int =
+        call(importNodesMethod, portableJmx) as? Int
+            ?: throw JMeterRuntimeException("JMeter returned an incompatible imported-node count")
 
     override val canRunSelectedThreadGroups: Boolean
         get() = call(canRunSelectedThreadGroupsMethod) as? Boolean

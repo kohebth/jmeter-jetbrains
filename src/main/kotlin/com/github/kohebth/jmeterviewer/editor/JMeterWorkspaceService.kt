@@ -8,6 +8,7 @@ import com.github.kohebth.jmeterviewer.execution.JMeterRunMode
 import com.github.kohebth.jmeterviewer.runtime.JMeterConfigurationException
 import com.github.kohebth.jmeterviewer.runtime.JMeterJavaEnvironment
 import com.github.kohebth.jmeterviewer.runtime.JMeterRuntimeService
+import com.github.kohebth.jmeterviewer.runtime.JMeterRuntimeSession
 import com.github.kohebth.jmeterviewer.runtime.JMeterReplaceResult
 import com.github.kohebth.jmeterviewer.runtime.JMeterSearchMatch
 import com.github.kohebth.jmeterviewer.runtime.JMeterWorkspace
@@ -20,8 +21,6 @@ import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessHandler
-import com.intellij.notification.NotificationGroupManager
-import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -50,15 +49,214 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JComponent
 import javax.swing.Timer
 
-@Service(Service.Level.APP)
-class JMeterWorkspaceService : Disposable {
+@Service(Service.Level.PROJECT)
+class JMeterWorkspaceService(
+    private val project: Project,
+) : Disposable {
     private val fileDocumentManager = FileDocumentManager.getInstance()
-    private var workspace: JMeterWorkspace? = null
+    private val sessions = IdentityHashMap<JMeterVisualFileEditor, JMeterEditorSession>()
+    private val documentRegistry = ApplicationManager.getApplication()
+        .getService(JMeterDocumentSessionRegistry::class.java)
+    private var activeSession: JMeterEditorSession? = null
+    private var disposed = false
+
+    fun activate(editor: JMeterVisualFileEditor) = onEdt {
+        if (disposed || editor.project !== project || project.isDisposed) {
+            return@onEdt
+        }
+        val session = sessions[editor] ?: openSession(editor) ?: return@onEdt
+        if (activeSession !== session) {
+            val previous = activeSession
+            previous?.deactivate(previous.editor)
+            if (previous?.isEditorActive == true) {
+                editor.showSwitchBlocked()
+                return@onEdt
+            }
+            activeSession = session
+        }
+        session.activate(editor)
+    }
+
+    fun retry(editor: JMeterVisualFileEditor) {
+        activate(editor)
+    }
+
+    fun deactivate(editor: JMeterVisualFileEditor) = onEdt {
+        val session = sessions[editor] ?: return@onEdt
+        session.deactivate(editor)
+        if (activeSession === session && !session.isEditorActive) {
+            activeSession = null
+            if (!project.isDisposed) {
+                project.getService(JMeterToolWindowController::class.java).showEmpty()
+            }
+        }
+    }
+
+    fun unregister(editor: JMeterVisualFileEditor) = onEdt {
+        val session = sessions.remove(editor)
+        if (activeSession === session) {
+            activeSession = null
+        }
+        try {
+            session?.unregister(editor)
+            session?.dispose()
+        } finally {
+            documentRegistry.release(editor)
+        }
+        if (!project.isDisposed && activeSession == null) {
+            project.getService(JMeterToolWindowController::class.java).showEmpty()
+        }
+    }
+
+    fun isModified(editor: JMeterVisualFileEditor): Boolean = onEdt {
+        sessions[editor]?.isModified(editor)
+            ?: fileDocumentManager.isDocumentUnsaved(editor.document)
+    }
+
+    internal fun prepareExternalRun(
+        targetFileUrl: String,
+        mode: JMeterRunMode,
+    ): JMeterLaunchRequest = onEdt {
+        sessionForUrl(targetFileUrl)?.prepareExternalRun(mode)
+            ?: throw IllegalStateException(
+                "The JMeter visual session for $targetFileUrl is no longer open.",
+            )
+    }
+
+    internal fun bindExternalProcess(request: JMeterLaunchRequest, handler: ProcessHandler) = onEdt {
+        sessionForFile(request.ownerFile)?.bindExternalProcess(request, handler)
+            ?: run {
+                handler.destroyProcess()
+                throw IllegalStateException("The JMeter visual session was closed before the run started.")
+            }
+    }
+
+    internal fun abortExternalRun(request: JMeterLaunchRequest) = onEdt {
+        sessionForFile(request.ownerFile)?.abortExternalRun(request)
+    }
+
+    internal fun isActive(session: JMeterEditorSession): Boolean = activeSession === session
+
+    internal fun performShortcut(
+        editor: JMeterVisualFileEditor,
+        command: String,
+        argument: String?,
+    ) = onEdt {
+        sessions[editor]?.performShortcut(command, argument)
+    }
+
+    private fun openSession(editor: JMeterVisualFileEditor): JMeterEditorSession? {
+        val claimed = documentRegistry.claim(editor) {
+            ApplicationManager.getApplication().invokeLater {
+                if (!disposed && editor.isValid) {
+                    retry(editor)
+                }
+            }
+        }
+        if (!claimed) {
+            editor.showLoadError(
+                "This physical JMX file already has a visual JMeter editor in another IDE window. " +
+                    "Close that visual tab, or use Open Text here.",
+            )
+            return null
+        }
+
+        var runtimeSession: JMeterRuntimeSession? = null
+        return try {
+            runtimeSession = ApplicationManager.getApplication()
+                .getService(JMeterRuntimeService::class.java)
+                .openSession()
+            JMeterEditorSession(this, editor, runtimeSession).also { session ->
+                sessions[editor] = session
+                documentRegistry.bind(editor, session)
+            }
+        } catch (failure: JMeterConfigurationException) {
+            runtimeSession?.close()
+            documentRegistry.release(editor)
+            editor.showLoadError(readableMessage(failure), offerConfiguration = true)
+            null
+        } catch (failure: Exception) {
+            runtimeSession?.close()
+            documentRegistry.release(editor)
+            editor.showLoadError(readableMessage(failure))
+            null
+        } catch (failure: LinkageError) {
+            runtimeSession?.close()
+            documentRegistry.release(editor)
+            editor.showLoadError(readableMessage(failure))
+            null
+        }
+    }
+
+    private fun sessionForUrl(url: String): JMeterEditorSession? =
+        sessions.values.firstOrNull { it.editor.virtualFile.url == url }
+
+    private fun sessionForFile(file: VirtualFile): JMeterEditorSession? =
+        sessions.values.firstOrNull { it.editor.virtualFile == file }
+
+    private fun readableMessage(failure: Throwable): String {
+        var root = failure
+        while (root.cause != null && root.cause !== root) {
+            root = root.cause!!
+        }
+        return root.message ?: root.javaClass.simpleName
+    }
+
+    private fun <T> onEdt(action: () -> T): T {
+        val application = ApplicationManager.getApplication()
+        if (application.isDispatchThread) {
+            return action()
+        }
+        val value = AtomicReference<Any?>()
+        val failure = AtomicReference<Throwable?>()
+        application.invokeAndWait {
+            try {
+                value.set(action())
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            }
+        }
+        failure.get()?.let { throw it }
+        @Suppress("UNCHECKED_CAST")
+        return value.get() as T
+    }
+
+    override fun dispose() {
+        if (disposed) {
+            return
+        }
+        disposed = true
+        onEdt {
+            sessions.keys.toList().forEach { editor ->
+                val session = sessions.remove(editor)
+                try {
+                    session?.dispose()
+                } finally {
+                    documentRegistry.release(editor)
+                }
+            }
+            activeSession = null
+        }
+    }
+}
+
+internal class JMeterEditorSession(
+    private val manager: JMeterWorkspaceService,
+    internal val editor: JMeterVisualFileEditor,
+    private val runtimeSession: JMeterRuntimeSession,
+) : Disposable {
+    internal val isEditorActive: Boolean
+        get() = activeEditor != null
+
+    private val fileDocumentManager = FileDocumentManager.getInstance()
+    private var workspace: JMeterWorkspace? = runtimeSession.workspace
+    private var workspaceInitialized = false
     private var loadedFile: VirtualFile? = null
     private var syncState: DocumentSyncState? = null
     private var activeEditor: JMeterVisualFileEditor? = null
     private val resultSessionIds = IdentityHashMap<VirtualFile, String>()
     private var textAreaAdapters: JMeterTextAreaAdapters? = null
+    private var shortcutController: JMeterShortcutController? = null
     private var fieldEditGroup: Any? = null
     private var pendingVisualChange = false
     private var runningFile: VirtualFile? = null
@@ -81,14 +279,6 @@ class JMeterWorkspaceService : Disposable {
 
     fun activate(editor: JMeterVisualFileEditor) = onEdt {
         if (disposed || editor.project.isDisposed || !editor.virtualFile.isValid) {
-            return@onEdt
-        }
-
-        if (runInProgress() && runningFile != null && runningFile != editor.virtualFile) {
-            val message = "${runningFile?.name} is running in the JMeter process. " +
-                "The shared visual workspace stays reserved until the process stops; XML editors remain available."
-            editor.showSwitchBlocked(message)
-            notifyRunPinned(editor.project, message)
             return@onEdt
         }
 
@@ -294,21 +484,28 @@ class JMeterWorkspaceService : Disposable {
     }
 
     private fun ensureWorkspace(): JMeterWorkspace {
-        workspace?.let { return it }
-        return ApplicationManager.getApplication()
-            .getService(JMeterRuntimeService::class.java)
-            .createWorkspace()
-            .also { nativeWorkspace ->
-                nativeWorkspace.setModelChangeListener(Runnable {
-                    if (!disposed) {
-                        textAreaAdapters?.scanNow()
+        val nativeWorkspace = workspace
+            ?: throw IllegalStateException("The JMeter visual session is closed.")
+        if (!workspaceInitialized) {
+            nativeWorkspace.setModelChangeListener(Runnable {
+                if (!disposed) {
+                    textAreaAdapters?.scanNow()
+                    val changedEditor = activeEditor
+                    if (changedEditor != null) {
+                        ApplicationManager.getApplication().invokeLater {
+                            if (!disposed && activeEditor === changedEditor) {
+                                changedEditor.refreshModifiedState()
+                            }
+                        }
                     }
-                })
-                nativeWorkspace.setExecutionActionListener(ActionListener { event ->
-                    handleExecutionAction(event.actionCommand)
-                })
-                workspace = nativeWorkspace
-            }
+                }
+            })
+            nativeWorkspace.setExecutionActionListener(ActionListener { event ->
+                handleExecutionAction(event.actionCommand)
+            })
+            workspaceInitialized = true
+        }
+        return nativeWorkspace
     }
 
     private fun loadDocument(
@@ -417,7 +614,7 @@ class JMeterWorkspaceService : Disposable {
         replacement: TextReplacement,
         commandName: String,
         commandGroup: Any,
-        visualUndoEnabled: Boolean = JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
+        jetbrainsVisualUndoEnabled: Boolean = JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED,
     ) {
         val application = ApplicationManager.getApplication()
         val mutation = Runnable {
@@ -434,7 +631,7 @@ class JMeterWorkspaceService : Disposable {
                 application.runWriteAction(mutation)
             }
         }
-        if (!visualUndoEnabled) {
+        if (!jetbrainsVisualUndoEnabled) {
             UndoUtil.disableUndoIn(editor.document, writeMutation)
             return
         }
@@ -477,7 +674,7 @@ class JMeterWorkspaceService : Disposable {
             },
             onHistoryAction = { redo ->
                 performHistoryActionIfEnabled(
-                    JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
+                    JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED,
                     editor,
                     redo,
                     null,
@@ -499,6 +696,7 @@ class JMeterWorkspaceService : Disposable {
                 }
             },
             adaptMultilineTextAreas = JMeterEditorFeatures.JETBRAINS_MULTILINE_EDITOR_ENABLED,
+            jetbrainsHistoryEnabled = JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED,
             onFocusStarted = {
                 if (fieldEditGroup == null) {
                     fieldEditGroup = Any()
@@ -514,13 +712,21 @@ class JMeterWorkspaceService : Disposable {
             },
             onHistoryAction = { redo, focus ->
                 performHistoryActionIfEnabled(
-                    JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
+                    JMeterEditorFeatures.JETBRAINS_VISUAL_UNDO_ENABLED,
                     editor,
                     redo,
                     focus,
                 )
             },
             onLanguageContextChanged = editor::showLanguageContext,
+        )
+        shortcutController?.dispose()
+        shortcutController = JMeterShortcutController(
+            editor = editor,
+            service = manager,
+            nativeShortcuts = nativeWorkspace.shortcutDescriptors,
+            roots = listOf(editor.component) + controller.shortcutRoots(),
+            treeRoot = nativeWorkspace.outlineComponent,
         )
     }
 
@@ -718,12 +924,38 @@ class JMeterWorkspaceService : Disposable {
             "JMeter: ${editor.virtualFile.nameWithoutExtension}",
             factory,
         )
-        (settings.configuration as JMeterRunConfiguration).runMode = mode
+        val configuration = settings.configuration as JMeterRunConfiguration
+        configuration.runMode = mode
+        configuration.targetFileUrl = editor.virtualFile.url
+        configuration.setAllowRunningInParallel(true)
+        settings.setActivateToolWindowBeforeRun(false)
         runManager.setTemporaryConfiguration(settings)
         ProgramRunnerUtil.executeConfiguration(
             settings,
             DefaultRunExecutor.getRunExecutorInstance(),
         )
+    }
+
+    internal fun performShortcut(command: String, argument: String?) {
+        when (command) {
+            "save" -> persist(editor, saveToDisk = true)
+            "search_tree" -> {
+                if (manager.isActive(this)) {
+                    editor.project.getService(JMeterToolWindowController::class.java).showSearch()
+                }
+            }
+            "search_reset" -> editor.project
+                .getService(JMeterToolWindowController::class.java)
+                .resetTestPlanSearch()
+            "run_tg", "run_tg_no_timers", "validate_tg" -> handleExecutionAction(command)
+            "shutdown" -> activeProcess?.takeIf { !it.isProcessTerminated }?.destroyProcess()
+            "stop" -> activeProcess?.takeIf { !it.isProcessTerminated }?.destroyProcess()
+            "undo", "redo", "select_all" -> Unit
+            else -> {
+                ensureWorkspace().performAction(command, argument)
+                editor.refreshModifiedState()
+            }
+        }
     }
 
     private fun clearRunningState() {
@@ -734,13 +966,10 @@ class JMeterWorkspaceService : Disposable {
         activeProcess = null
     }
 
-    internal fun prepareExternalRun(project: Project, mode: JMeterRunMode): JMeterLaunchRequest = onEdt {
+    internal fun prepareExternalRun(mode: JMeterRunMode): JMeterLaunchRequest = onEdt {
         check(!runInProgress()) { "Another JMeter process is already running." }
-        val editor = activeEditor
-            ?.takeIf { it.project === project && it.virtualFile.isValid }
-            ?: throw IllegalStateException(
-                "Open a JMX file in the JMeter visual editor and select one or more Thread Groups.",
-            )
+        val editor = this.editor.takeIf { it.virtualFile.isValid }
+            ?: throw IllegalStateException("The target JMX file is no longer open.")
         val nativeWorkspace = workspace
             ?: throw IllegalStateException("The JMeter visual workspace is not loaded.")
         check(nativeWorkspace.canRunSelectedThreadGroups) {
@@ -885,23 +1114,14 @@ class JMeterWorkspaceService : Disposable {
 
     private fun showResultsForRunningFile() {
         val editor = runningEditor ?: return
-        val controller = editor.project.getService(JMeterToolWindowController::class.java)
-        val toolWindow = ToolWindowManager.getInstance(editor.project).getToolWindow(JMETER_TOOL_WINDOW_ID)
-        if (toolWindow == null) {
-            controller.selectResultsTree()
-        } else {
-            toolWindow.activate(Runnable { controller.selectResultsTree() })
+        if (!manager.isActive(this)) {
+            return
         }
+        val controller = editor.project.getService(JMeterToolWindowController::class.java)
+        controller.selectResultsTree(showWindow = false)
     }
 
     private fun runInProgress(): Boolean = pendingRun != null || activeRun != null
-
-    private fun notifyRunPinned(project: Project, message: String) {
-        NotificationGroupManager.getInstance()
-            .getNotificationGroup(NOTIFICATION_GROUP_ID)
-            .createNotification(message, NotificationType.INFORMATION)
-            .notify(project)
-    }
 
     private fun cleanupRunFiles(request: JMeterLaunchRequest) {
         request.bridge.close()
@@ -942,6 +1162,8 @@ class JMeterWorkspaceService : Disposable {
         cancelPendingFieldSnapshot()
         textAreaAdapters?.dispose()
         textAreaAdapters = null
+        shortcutController?.dispose()
+        shortcutController = null
         editor.showLanguageContext(null)
         fieldEditGroup = null
         pendingVisualChange = false
@@ -1016,7 +1238,8 @@ class JMeterWorkspaceService : Disposable {
             cancelPendingFieldSnapshot()
             textAreaAdapters?.dispose()
             textAreaAdapters = null
-            // JMeterRuntimeService owns and closes the shared native workspace.
+            shortcutController?.dispose()
+            shortcutController = null
             workspace?.takeUnless(JMeterWorkspace::isClosed)?.let { nativeWorkspace ->
                 try {
                     nativeWorkspace.setExecutionActionListener(null)
@@ -1034,6 +1257,7 @@ class JMeterWorkspaceService : Disposable {
             syncState = null
             resultSessionIds.clear()
             clearRunningState()
+            runtimeSession.close()
         }
     }
 
@@ -1050,12 +1274,11 @@ class JMeterWorkspaceService : Disposable {
     )
 
     private companion object {
-        val LOG: Logger = Logger.getInstance(JMeterWorkspaceService::class.java)
+        val LOG: Logger = Logger.getInstance(JMeterEditorSession::class.java)
         const val FIELD_SNAPSHOT_DELAY_MS = 250
         const val MAX_SAMPLES_PER_EDT_BATCH = 32
         const val JMX_EDIT_COMMAND_NAME = "Edit JMeter Test Plan"
         const val JMX_REPLACE_COMMAND_NAME = "Replace in JMeter Test Plan"
         const val JMETER_TOOL_WINDOW_ID = "JMeter"
-        const val NOTIFICATION_GROUP_ID = "JMeter"
     }
 }
