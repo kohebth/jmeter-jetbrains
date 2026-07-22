@@ -16,6 +16,8 @@ class JMeterTextAreaPolicyTest {
         JScrollPane(textArea)
 
         assertTrue(JMeterTextAreaPolicy.canAdapt(textArea))
+        assertTrue(JMeterTextAreaPolicy.shouldAdapt(textArea, enabled = true))
+        assertFalse(JMeterTextAreaPolicy.shouldAdapt(textArea, enabled = false))
     }
 
     @Test
@@ -29,10 +31,19 @@ class JMeterTextAreaPolicyTest {
     }
 
     @Test
-    fun tracksSingleLineFormFieldsInTheJmxHistory() {
+    fun tracksNativeFormFieldsForAutosave() {
         val field = JTextField("plan name")
         JPanel().add(field)
 
-        assertTrue(JMeterTextAreaPolicy.canTrackHistory(field))
+        assertTrue(JMeterTextAreaPolicy.canTrackChanges(field))
+    }
+
+    @Test
+    fun tracksNativeMultilineFieldsWhenTheJetbrainsAdapterIsDisabled() {
+        val textArea = JTextArea("script")
+        JScrollPane(textArea)
+
+        assertFalse(JMeterTextAreaPolicy.shouldAdapt(textArea, enabled = false))
+        assertTrue(JMeterTextAreaPolicy.canTrackChanges(textArea))
     }
 }

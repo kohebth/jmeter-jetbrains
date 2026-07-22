@@ -1,5 +1,6 @@
 package com.github.kohebth.jmeterviewer.toolwindow
 
+import com.github.kohebth.jmeterviewer.editor.JMeterEditorFeatures
 import com.github.kohebth.jmeterviewer.runtime.JMeterWorkspace
 import com.github.kohebth.jmeterviewer.runtime.JMeterReplaceResult
 import com.github.kohebth.jmeterviewer.runtime.JMeterSearchMatch
@@ -151,7 +152,7 @@ internal class JMeterToolWindowController : Disposable {
     }
 
     private class TestPlanHost : JPanel(BorderLayout()) {
-        private val searchToggle = JButton("Hide Search")
+        private val searchToggle = JButton("Search")
         private val searchPanel = SearchPanel()
         private var splitPane: JSplitPane? = null
         private var mountedComponent: JComponent? = null
@@ -200,8 +201,7 @@ internal class JMeterToolWindowController : Disposable {
                 border = null
             }
             add(splitPane, BorderLayout.CENTER)
-            setSearchVisible(true)
-            SwingUtilities.invokeLater { splitPane?.setDividerLocation(0.68) }
+            setSearchVisible(JMeterEditorFeatures.SEARCH_VISIBLE_ON_MOUNT)
             revalidate()
             repaint()
         }

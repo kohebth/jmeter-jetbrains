@@ -40,11 +40,12 @@ compatible third-party plugins from the selected JMeter 5.6.3 installation.
 Recorder, templates, and report generation are intentionally not exposed in the
 JetBrains UI.
 
-Large JMeter text areas are backed by temporary IntelliJ editors. Their language
-is inferred from JMeter's syntax style and can be overridden from the footer;
-**Reformat** uses the installed IDE language formatter. These temporary fields
-do not retain independent undo stacks—the JMX document remains the single undo
-and redo history.
+Multiline fields currently use JMeter's native Swing editors. The experimental
+IntelliJ text-area adapter, language selection, and reformatting implementation
+remain in the source behind a disabled feature switch for later debugging.
+Per-field undo and visual-form JMX undo are also temporarily suspended; undo in
+the XML source editor remains available. Test Plan search starts collapsed and
+can be opened with the **Search** button or `Ctrl+F` (`Cmd+F` on macOS).
 
 Selected thread groups run through a normal IntelliJ **JMeter Selected Thread
 Groups** Run Configuration and the configured installation's `bin/jmeter`

@@ -64,13 +64,15 @@ internal data class JMeterLanguageContext(
 )
 
 /**
- * Replaces visible persistent JMeter text areas with short-lived IntelliJ
- * editors. Their documents have undo disabled; the backing JMX document owns
- * the only history retained by the IDE.
+ * Tracks visible JMeter text fields for autosave and, when enabled, replaces
+ * persistent multiline fields with short-lived IntelliJ editors. The adapter
+ * implementation remains available while native JMeter fields are the stable
+ * default.
  */
 internal class JMeterTextAreaAdapters(
     private val project: Project,
     private val roots: () -> Collection<JComponent>,
+    private val adaptMultilineTextAreas: Boolean,
     private val onFocusStarted: () -> Unit,
     private val onFocusEnded: () -> Unit,
     private val onFieldChanged: () -> Unit,
@@ -180,7 +182,10 @@ internal class JMeterTextAreaAdapters(
             foundContainers.add(component)
         }
 
-        if (component is JTextArea && JMeterTextAreaPolicy.canAdapt(component)) {
+        if (
+            component is JTextArea &&
+            JMeterTextAreaPolicy.shouldAdapt(component, adaptMultilineTextAreas)
+        ) {
             val adapter = adapters[component] ?: TextAreaAdapter(component).also {
                 adapters[component] = it
             }
@@ -188,7 +193,7 @@ internal class JMeterTextAreaAdapters(
             return
         }
 
-        if (component is JTextComponent && JMeterTextAreaPolicy.canTrackHistory(component)) {
+        if (component is JTextComponent && JMeterTextAreaPolicy.canTrackChanges(component)) {
             val tracker = nativeFields[component] ?: NativeFieldTracker(component).also {
                 nativeFields[component] = it
             }

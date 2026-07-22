@@ -8,6 +8,9 @@ import javax.swing.SwingUtilities
 import javax.swing.text.JTextComponent
 
 internal object JMeterTextAreaPolicy {
+    fun shouldAdapt(component: JTextComponent, enabled: Boolean): Boolean =
+        enabled && canAdapt(component)
+
     fun canAdapt(component: JTextComponent): Boolean {
         if (component.parent !is JViewport) {
             return false
@@ -15,7 +18,7 @@ internal object JMeterTextAreaPolicy {
         return !hasExcludedAncestor(component)
     }
 
-    fun canTrackHistory(component: JTextComponent): Boolean =
+    fun canTrackChanges(component: JTextComponent): Boolean =
         component.isEditable && !hasExcludedAncestor(component)
 
     private fun hasExcludedAncestor(component: JTextComponent): Boolean =

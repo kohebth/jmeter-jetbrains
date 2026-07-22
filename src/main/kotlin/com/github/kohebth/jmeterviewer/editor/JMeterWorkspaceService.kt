@@ -27,6 +27,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.command.undo.UndoManager
+import com.intellij.openapi.command.undo.UndoUtil
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -416,6 +417,7 @@ class JMeterWorkspaceService : Disposable {
         replacement: TextReplacement,
         commandName: String,
         commandGroup: Any,
+        visualUndoEnabled: Boolean = JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
     ) {
         val application = ApplicationManager.getApplication()
         val mutation = Runnable {
@@ -431,6 +433,10 @@ class JMeterWorkspaceService : Disposable {
             } else {
                 application.runWriteAction(mutation)
             }
+        }
+        if (!visualUndoEnabled) {
+            UndoUtil.disableUndoIn(editor.document, writeMutation)
+            return
         }
         val commandProcessor = CommandProcessor.getInstance()
         if (commandProcessor.currentCommand != null) {
@@ -469,7 +475,14 @@ class JMeterWorkspaceService : Disposable {
                     regexp,
                 )
             },
-            onHistoryAction = { redo -> performHistoryAction(editor, redo, null) },
+            onHistoryAction = { redo ->
+                performHistoryActionIfEnabled(
+                    JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
+                    editor,
+                    redo,
+                    null,
+                )
+            },
         )
         ToolWindowManager.getInstance(editor.project)
             .getToolWindow(JMETER_TOOL_WINDOW_ID)
@@ -485,6 +498,7 @@ class JMeterWorkspaceService : Disposable {
                     addAll(controller.visibleTextRoots())
                 }
             },
+            adaptMultilineTextAreas = JMeterEditorFeatures.JETBRAINS_MULTILINE_EDITOR_ENABLED,
             onFocusStarted = {
                 if (fieldEditGroup == null) {
                     fieldEditGroup = Any()
@@ -499,7 +513,12 @@ class JMeterWorkspaceService : Disposable {
                 editor.refreshModifiedState()
             },
             onHistoryAction = { redo, focus ->
-                performHistoryAction(editor, redo, focus)
+                performHistoryActionIfEnabled(
+                    JMeterEditorFeatures.VISUAL_UNDO_ENABLED,
+                    editor,
+                    redo,
+                    focus,
+                )
             },
             onLanguageContextChanged = editor::showLanguageContext,
         )
@@ -652,6 +671,17 @@ class JMeterWorkspaceService : Disposable {
         focus?.let { textAreaAdapters?.restoreAfterHistory(it) }
         fieldEditGroup = Any()
         editor.refreshModifiedState()
+    }
+
+    private fun performHistoryActionIfEnabled(
+        enabled: Boolean,
+        editor: JMeterVisualFileEditor,
+        redo: Boolean,
+        focus: JMeterFieldFocus?,
+    ) {
+        if (enabled) {
+            performHistoryAction(editor, redo, focus)
+        }
     }
 
     private fun sessionIdFor(file: VirtualFile): String =
