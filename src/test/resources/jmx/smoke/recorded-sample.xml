@@ -1,8 +1,0 @@
-<httpSample t="37" lt="12" ct="3" ts="1784688000000" s="true" lb="Recorded Localhost Request" rc="200" rm="OK" tn="smoke-1" dt="text" de="UTF-8" by="49" sby="91" sc="1" ec="0" ng="1" na="1">
-  <responseHeader class="java.lang.String">HTTP/1.1 200 OK&#10;Content-Type: application/json&#10;X-Smoke-Response: response-42</responseHeader>
-  <requestHeader class="java.lang.String">Accept: application/json&#10;X-Smoke-Request: request-42</requestHeader>
-  <responseData class="java.lang.String">{&quot;status&quot;:&quot;recorded&quot;,&quot;requestId&quot;:&quot;request-42&quot;}</responseData>
-  <responseFile class="java.lang.String"></responseFile>
-  <samplerData class="java.lang.String">GET http://127.0.0.1:18080/recorded&#10;requestId=request-42</samplerData>
-  <java.net.URL>http://127.0.0.1:18080/recorded</java.net.URL>
-</httpSample>

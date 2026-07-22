@@ -66,6 +66,7 @@ import org.apache.jmeter.reporters.ResultCollector;
 import org.apache.jmeter.reporters.ResultCollectorHelper;
 import org.apache.jmeter.save.SaveService;
 import org.apache.jmeter.samplers.SampleResult;
+import org.apache.jmeter.testbeans.gui.TestBeanGUI;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.visualizers.Visualizer;
 import org.apache.jorphan.collections.HashTree;
@@ -87,6 +88,9 @@ import org.slf4j.LoggerFactory;
 public final class EmbeddedJMeterWorkspace implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(EmbeddedJMeterWorkspace.class);
     private static final int EMBEDDED_ACTION_ID = 0x4a4d58;
+    private static final String JSR223_SCRIPT_LANGUAGE = "scriptLanguage";
+    private static final String JSR223_CACHE_KEY = "cacheKey";
+    private static final String JSR223_SCRIPT = "script";
     public static final String RUN_SELECTED_THREAD_GROUPS = "jmeter.run.selected.thread.groups";
     public static final String SHUTDOWN_TEST = "jmeter.shutdown.test";
     public static final String STOP_TEST = "jmeter.stop.test";
@@ -757,17 +761,18 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
                     "org.apache.jmeter.visualizers.JSR223Listener",
                     true,
                     loader).getDeclaredConstructor().newInstance();
-            listener.getClass().getMethod("setName", String.class)
-                    .invoke(listener, "JetBrains Live Results");
-            listener.getClass().getMethod("setScriptLanguage", String.class)
-                    .invoke(listener, "groovy");
-            listener.getClass().getMethod("setCacheKey", String.class)
-                    .invoke(listener, "jetbrains-results-" + requiredToken);
-            listener.getClass().getMethod("setScript", String.class).invoke(listener, script);
             if (!(listener instanceof TestElement)) {
                 throw new IllegalStateException("JMeter returned an invalid JSR223 listener");
             }
-            return (TestElement) listener;
+            TestElement testElement = (TestElement) listener;
+            testElement.setName("JetBrains Live Results");
+            testElement.setEnabled(true);
+            testElement.setProperty(TestElement.GUI_CLASS, TestBeanGUI.class.getName());
+            testElement.setProperty(TestElement.TEST_CLASS, listener.getClass().getName());
+            testElement.setProperty(JSR223_SCRIPT_LANGUAGE, "groovy");
+            testElement.setProperty(JSR223_CACHE_KEY, "jetbrains-results-" + requiredToken);
+            testElement.setProperty(JSR223_SCRIPT, script);
+            return testElement;
         } catch (ReflectiveOperationException | LinkageError failure) {
             throw new IllegalStateException("Unable to create the live result bridge listener", failure);
         }
@@ -775,7 +780,13 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
 
     private static String resultBridgeScript(int port, String token, String encodedJournal) {
         return "def sampleWriter = new java.io.StringWriter()\n"
-                + "org.apache.jmeter.save.SaveService.saveSampleResult(sampleEvent, sampleWriter)\n"
+                + "def previousSaveConfig = sampleResult.getSaveConfig()\n"
+                + "sampleResult.setSaveConfig(new org.apache.jmeter.samplers.SampleSaveConfiguration(true))\n"
+                + "try {\n"
+                + "  org.apache.jmeter.save.SaveService.saveSampleResult(sampleEvent, sampleWriter)\n"
+                + "} finally {\n"
+                + "  sampleResult.setSaveConfig(previousSaveConfig)\n"
+                + "}\n"
                 + "byte[] payload = sampleWriter.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)\n"
                 + "String sampleId = java.util.UUID.randomUUID().toString()\n"
                 + "byte[] idBytes = sampleId.getBytes(java.nio.charset.StandardCharsets.UTF_8)\n"
