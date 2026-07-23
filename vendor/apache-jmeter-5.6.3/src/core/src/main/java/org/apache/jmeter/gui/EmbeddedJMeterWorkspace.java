@@ -30,10 +30,8 @@ import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -115,7 +113,6 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
     private final Start startCommand;
     private final JComponent embeddedComponent;
     private final Map<String, ResultSession> resultSessions = new LinkedHashMap<>();
-    private final Deque<ResultSession> reusableResultSessions = new ArrayDeque<>();
     private final JComponent outlineComponent;
     private Runnable modelChangeListener = () -> { };
     private boolean closed;
@@ -558,9 +555,7 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         ensureOpen();
         ResultSession session = resultSessions.remove(requireSessionId(sessionId));
         if (session != null) {
-            if (clearResultSession(session, "discarding a result session")) {
-                reusableResultSessions.addLast(session);
-            }
+            closeResultSession(session, "discarding a result session");
         }
     }
 
@@ -685,10 +680,9 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
             }
         });
         for (ResultSession session : resultSessions.values()) {
-            clearResultSession(session, "closing a result session");
+            closeResultSession(session, "closing a result session");
         }
         resultSessions.clear();
-        reusableResultSessions.clear();
         cleanup("detaching the selected-thread-group listener",
                 () -> startCommand.setSelectedThreadGroupRunListener(null));
         modelChangeListener = () -> { };
@@ -699,13 +693,11 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         cleanup("disposing the embedded GUI package", () -> GuiPackage.disposeInstance(guiPackage));
     }
 
-    private static boolean clearResultSession(ResultSession session, String operation) {
+    private static void closeResultSession(ResultSession session, String operation) {
         try {
-            session.clear();
-            return true;
+            session.close();
         } catch (RuntimeException | LinkageError failure) {
-            LOG.warn("Unable to clear JMeter result components while {}", operation, failure);
-            return false;
+            LOG.warn("Unable to close JMeter result components while {}", operation, failure);
         }
     }
 
@@ -764,10 +756,7 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
 
     private ResultSession resultSession(String sessionId) {
         String id = requireSessionId(sessionId);
-        return resultSessions.computeIfAbsent(id, ignored -> {
-            ResultSession reusable = reusableResultSessions.pollFirst();
-            return reusable == null ? new ResultSession() : reusable;
-        });
+        return resultSessions.computeIfAbsent(id, ignored -> new ResultSession());
     }
 
     private static String requireSessionId(String sessionId) {
@@ -988,6 +977,8 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         private final JComponent aggregateReport;
         private final Visualizer resultsVisualizer;
         private final Visualizer aggregateVisualizer;
+        private final AutoCloseable resultsLifecycle;
+        private final AutoCloseable aggregateLifecycle;
         private final ResultCollector resultCollector;
         private final List<TestElement> collectors;
 
@@ -996,6 +987,8 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
             aggregateReport = createVisualizer(AGGREGATE_REPORT_CLASS);
             resultsVisualizer = (Visualizer) resultsTree;
             aggregateVisualizer = (Visualizer) aggregateReport;
+            resultsLifecycle = (AutoCloseable) resultsTree;
+            aggregateLifecycle = (AutoCloseable) aggregateReport;
             resultCollector = createCollector(resultsTree);
             collectors = Arrays.asList(resultCollector, createCollector(aggregateReport));
         }
@@ -1003,6 +996,19 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
         private void clear() {
             ((Clearable) resultsTree).clearData();
             ((Clearable) aggregateReport).clearData();
+        }
+
+        private void close() {
+            IllegalStateException failure = closeVisualizer(resultsLifecycle);
+            IllegalStateException aggregateFailure = closeVisualizer(aggregateLifecycle);
+            if (failure == null) {
+                failure = aggregateFailure;
+            } else if (aggregateFailure != null) {
+                failure.addSuppressed(aggregateFailure);
+            }
+            if (failure != null) {
+                throw failure;
+            }
         }
 
         private void append(byte[] xmlFragment) throws IOException {
@@ -1040,7 +1046,8 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
                         .newInstance();
                 if (!(visualizer instanceof JComponent)
                         || !(visualizer instanceof Clearable)
-                        || !(visualizer instanceof Visualizer)) {
+                        || !(visualizer instanceof Visualizer)
+                        || !(visualizer instanceof AutoCloseable)) {
                     throw new IllegalStateException(className + " is not an embeddable JMeter visualizer");
                 }
                 return (JComponent) visualizer;
@@ -1058,6 +1065,15 @@ public final class EmbeddedJMeterWorkspace implements AutoCloseable {
                 return (ResultCollector) collector;
             } catch (ReflectiveOperationException | LinkageError failure) {
                 throw visualizerFailure(visualizer.getClass().getName(), failure);
+            }
+        }
+
+        private static IllegalStateException closeVisualizer(AutoCloseable visualizer) {
+            try {
+                visualizer.close();
+                return null;
+            } catch (Exception | LinkageError failure) {
+                return visualizerFailure(visualizer.getClass().getName(), failure);
             }
         }
 

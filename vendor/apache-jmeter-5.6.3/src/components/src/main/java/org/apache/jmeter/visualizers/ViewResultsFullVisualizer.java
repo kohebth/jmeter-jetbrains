@@ -85,7 +85,7 @@ import org.slf4j.LoggerFactory;
 @GUIMenuSortOrder(1)
 @TestElementMetadata(labelResource = "view_results_tree_title")
 public class ViewResultsFullVisualizer extends AbstractVisualizer
-implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
+implements ActionListener, TreeSelectionListener, Clearable, ItemListener, AutoCloseable {
 
     private static final long serialVersionUID = 2L;
 
@@ -140,7 +140,9 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
     private TreeSelectionEvent lastSelectionEvent;
     private JCheckBox autoScrollCB;
     private final Queue<SampleResult> buffer;
+    private final Timer refreshTimer;
     private boolean dataChanged;
+    private boolean closed;
 
     /**
      * Constructor
@@ -154,7 +156,8 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
             buffer = new ArrayDeque<>();
         }
         init();
-        new Timer(REFRESH_PERIOD, e -> updateGui()).start();
+        refreshTimer = new Timer(REFRESH_PERIOD, e -> updateGui());
+        refreshTimer.start();
     }
 
     /** {@inheritDoc} */
@@ -330,6 +333,22 @@ implements ActionListener, TreeSelectionListener, Clearable, ItemListener {
         }
         resultsRender.clearData();
         resultsObject = null;
+    }
+
+    /**
+     * Stops background refreshes when the visualizer is removed from an embedded host.
+     */
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        refreshTimer.stop();
+        clearData();
+        synchronized (buffer) {
+            dataChanged = false;
+        }
     }
 
     /** {@inheritDoc} */

@@ -21,7 +21,13 @@ repositories {
 val jmeterVersion = "5.6.3"
 val remoteRobotVersion = "0.11.23"
 
-val jmeterBridge by configurations.creating {
+val jmeterBridgeCore by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+val jmeterBridgeVisualizers by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
     isTransitive = false
@@ -47,7 +53,11 @@ configurations.named("runtimeClasspath") {
 }
 
 dependencies {
-    add(jmeterBridge.name, "org.apache.jmeter:ApacheJMeter_core:$jmeterVersion")
+    add(jmeterBridgeCore.name, "org.apache.jmeter:ApacheJMeter_core:$jmeterVersion")
+    add(
+        jmeterBridgeVisualizers.name,
+        "org.apache.jmeter:ApacheJMeter_components:$jmeterVersion",
+    )
 
     listOf(
         "ApacheJMeter_config",
@@ -85,6 +95,37 @@ dependencies {
     add(ideUiTest.implementationConfigurationName, "org.junit.jupiter:junit-jupiter:5.10.3")
     add(ideUiTest.runtimeOnlyConfigurationName, "org.slf4j:slf4j-simple:2.0.13")
 }
+
+val jmeterBridgeJar by tasks.registering(Jar::class) {
+    group = "build"
+    description = "Assembles the JMeter core bridge with lifecycle-aware native result visualizers."
+    dependsOn(jmeterBridgeCore, jmeterBridgeVisualizers)
+    archiveFileName.set("ApacheJMeter_core-$jmeterVersion.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("jmeter-bridge"))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+            "Bundle-License" to "Apache-2.0",
+            "Specification-Title" to "Apache JMeter",
+            "Specification-Vendor" to "Apache Software Foundation",
+            "Implementation-Vendor" to "Apache Software Foundation",
+            "Implementation-Vendor-Id" to "org.apache",
+            "Implementation-Version" to jmeterVersion,
+            "JMeter-Skip-Class-Scanning" to "true",
+        )
+    }
+
+    from({ zipTree(jmeterBridgeCore.singleFile) })
+    from({ zipTree(jmeterBridgeVisualizers.singleFile) }) {
+        include(
+            "org/apache/jmeter/visualizers/ViewResultsFullVisualizer*.class",
+            "org/apache/jmeter/visualizers/StatVisualizer*.class",
+        )
+    }
+}
+
+val jmeterBridge = files(jmeterBridgeJar.flatMap { it.archiveFile })
+    .builtBy(jmeterBridgeJar)
 
 kotlin {
     jvmToolchain(17)

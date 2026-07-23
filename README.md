@@ -78,9 +78,10 @@ environment setup before running a thread group.
 
 JMeter and its dependencies are loaded from the selected installation in an
 isolated class loader. The distributable contains only the JetBrains plugin jar
-and a small patched JMeter core compatibility bridge. That bridge fixes native
-menu discovery when an external component contributes an item without a default
-menu-order entry; it also avoids leaking JMeter's logging, XML, and Kotlin
+and a small patched JMeter compatibility bridge. That bridge fixes native menu
+discovery when an external component contributes an item without a default
+menu-order entry and stops embedded result visualizers before their class
+loader closes; it also avoids leaking JMeter's logging, XML, and Kotlin
 dependencies into the IntelliJ Platform class loader.
 
 Apache JMeter 5.6.3 source is vendored under `vendor/apache-jmeter-5.6.3` so the

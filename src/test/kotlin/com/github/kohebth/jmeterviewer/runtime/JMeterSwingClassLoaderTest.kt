@@ -24,6 +24,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -35,6 +36,7 @@ import javax.swing.JTextArea
 import javax.swing.JTree
 import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
+import javax.swing.Timer
 import javax.swing.UIManager
 import javax.swing.text.JTextComponent
 import javax.swing.tree.DefaultMutableTreeNode
@@ -53,6 +55,67 @@ class JMeterSwingClassLoaderTest {
             )
             assertThrows<ClassNotFoundException> {
                 runtime.classLoader.loadClass(JMeterSwingClassLoaderTest::class.java.name)
+            }
+        }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "JMETER_GUI_SMOKE", matches = "true")
+    fun stopsResultRefreshTimersBeforeClosingTheRuntimeAndReopensAnEditablePlan() {
+        val stoppedTimers = openRuntime().use { runtime ->
+            withHostTreeUi {
+                val workspace = onEdt(runtime::createWorkspace)
+                onEdt {
+                    val fixture = resourcePath(COMPLEX_PLAN_RESOURCE)
+                    Files.newInputStream(fixture).use { workspace.load(it, fixture) }
+
+                    val discardedResults = workspace.resultsTreeComponent(DISCARDED_RESULT_SESSION)
+                    val discardedAggregate =
+                        workspace.aggregateReportComponent(DISCARDED_RESULT_SESSION)
+                    workspace.appendSampleResult(DISCARDED_RESULT_SESSION, CLOSE_RACE_SAMPLE)
+                    val discardedTimers = listOf(
+                        refreshTimer(discardedResults),
+                        refreshTimer(discardedAggregate),
+                    )
+                    assertTrue(discardedTimers.all(Timer::isRunning))
+                    workspace.discardResults(DISCARDED_RESULT_SESSION)
+                    assertTrue(discardedTimers.none(Timer::isRunning))
+
+                    val closingResults = workspace.resultsTreeComponent(CLOSING_RESULT_SESSION)
+                    val closingAggregate =
+                        workspace.aggregateReportComponent(CLOSING_RESULT_SESSION)
+                    workspace.appendSampleResult(CLOSING_RESULT_SESSION, CLOSE_RACE_SAMPLE)
+                    val closingTimers = listOf(
+                        refreshTimer(closingResults),
+                        refreshTimer(closingAggregate),
+                    )
+                    assertTrue(closingTimers.all(Timer::isRunning))
+                    workspace.close()
+                    discardedTimers + closingTimers
+                }
+            }
+        }
+
+        onEdt {
+            assertTrue(
+                stoppedTimers.none(Timer::isRunning),
+                "All native result refresh timers must stop before the runtime classloader closes",
+            )
+        }
+        assertEdtRemainsResponsivePastRefreshPeriod()
+
+        openRuntime().use { runtime ->
+            withHostTreeUi {
+                val workspace = onEdt(runtime::createWorkspace)
+                try {
+                    val fixture = resourcePath(COMPLEX_PLAN_RESOURCE)
+                    onEdt {
+                        Files.newInputStream(fixture).use { workspace.load(it, fixture) }
+                    }
+                    assertNativeTextUndo(workspace)
+                } finally {
+                    onEdt(workspace::close)
+                }
             }
         }
     }
@@ -585,6 +648,28 @@ class JMeterSwingClassLoaderTest {
         throw AssertionError("Results Tree did not receive $label")
     }
 
+    private fun refreshTimer(visualizer: JComponent): Timer {
+        val field = visualizer.javaClass.getDeclaredField("refreshTimer")
+        field.isAccessible = true
+        return field.get(visualizer) as Timer
+    }
+
+    private fun assertEdtRemainsResponsivePastRefreshPeriod() {
+        val responsive = CountDownLatch(1)
+        onEdt {
+            Timer(RESULT_REFRESH_PROBE_DELAY_MS) {
+                responsive.countDown()
+            }.apply {
+                isRepeats = false
+                start()
+            }
+        }
+        assertTrue(
+            responsive.await(EDT_PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+            "The EDT did not remain responsive after the JMeter runtime closed",
+        )
+    }
+
     private inline fun <reified T : Component> descendants(root: Component): List<T> {
         val matches = mutableListOf<T>()
         val pending = java.util.ArrayDeque<Component>()
@@ -685,9 +770,17 @@ class JMeterSwingClassLoaderTest {
         const val USERS_RESOURCE = "/jmx/smoke/users.csv"
         const val HEALTH_SAMPLE_LABEL = "Health Request"
         const val RESULT_SESSION = "complex-localhost-smoke"
+        const val DISCARDED_RESULT_SESSION = "discarded-close-race"
+        const val CLOSING_RESULT_SESSION = "workspace-close-race"
         const val RESULT_TIMEOUT_NANOS = 5_000_000_000L
+        const val RESULT_REFRESH_PROBE_DELAY_MS = 1_100
+        const val EDT_PROBE_TIMEOUT_SECONDS = 5L
         const val PROCESS_TIMEOUT_SECONDS = 45L
         const val PROCESS_STOP_TIMEOUT_SECONDS = 5L
+        val CLOSE_RACE_SAMPLE = (
+            "<sample s=\"true\" lb=\"Close Race Sample\" rc=\"200\" rm=\"OK\" " +
+                "dt=\"text\" sc=\"1\" ec=\"0\" ng=\"1\" na=\"1\"/>"
+            ).toByteArray(StandardCharsets.UTF_8)
     }
 
     private data class ProcessResult(

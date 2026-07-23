@@ -1,6 +1,7 @@
 package com.github.kohebth.jmeterviewer.runtime
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.InputStream
 import java.nio.file.Path
@@ -126,6 +127,25 @@ class EmbeddedJMeterWorkspaceContractTest {
                 .toAbsolutePath()
                 .normalize()
             assertEquals(ExternalJMeterTestSupport.bridge, source)
+
+            listOf(
+                "org.apache.jmeter.visualizers.ViewResultsFullVisualizer",
+                "org.apache.jmeter.visualizers.StatVisualizer",
+            ).forEach { className ->
+                val visualizer = runtime.classLoader.loadClass(className)
+                assertTrue(
+                    AutoCloseable::class.java.isAssignableFrom(visualizer),
+                    "$className must expose an embedded lifecycle",
+                )
+                val visualizerSource = Path.of(
+                    visualizer.protectionDomain.codeSource.location.toURI(),
+                ).toAbsolutePath().normalize()
+                assertEquals(
+                    ExternalJMeterTestSupport.bridge,
+                    visualizerSource,
+                    "$className must be loaded from the compatibility bridge",
+                )
+            }
         }
     }
 }

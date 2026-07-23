@@ -60,7 +60,8 @@ import org.apache.jorphan.gui.RendererUtils;
  */
 @GUIMenuSortOrder(3)
 @TestElementMetadata(labelResource = "aggregate_report")
-public class StatVisualizer extends AbstractVisualizer implements Clearable, ActionListener {
+public class StatVisualizer extends AbstractVisualizer
+        implements Clearable, ActionListener, AutoCloseable {
 
     private static final long serialVersionUID = 242L;
 
@@ -88,13 +89,18 @@ public class StatVisualizer extends AbstractVisualizer implements Clearable, Act
 
     private final Deque<SamplingStatCalculator> newRows = new ConcurrentLinkedDeque<>();
 
+    private final Timer refreshTimer;
+
     private volatile boolean dataChanged;
+
+    private boolean closed;
 
     public StatVisualizer() {
         super();
         model = StatGraphVisualizer.createObjectTableModel();
         clearData();
-        init();
+        refreshTimer = init();
+        refreshTimer.start();
     }
 
     /**
@@ -151,7 +157,7 @@ public class StatVisualizer extends AbstractVisualizer implements Clearable, Act
     /**
      * Main visualizer setup.
      */
-    private void init() { // WARNING: called from ctor so must not be overridden (i.e. must be private or final)
+    private Timer init() { // WARNING: called from ctor so must not be overridden (i.e. must be private or final)
         this.setLayout(new BorderLayout());
 
         // MAIN PANEL
@@ -179,7 +185,7 @@ public class StatVisualizer extends AbstractVisualizer implements Clearable, Act
         opts.add(saveHeaders, BorderLayout.EAST);
         this.add(opts,BorderLayout.SOUTH);
 
-        new Timer(REFRESH_PERIOD, e -> {
+        return new Timer(REFRESH_PERIOD, e -> {
             if (!dataChanged) {
                 return;
             }
@@ -190,7 +196,21 @@ public class StatVisualizer extends AbstractVisualizer implements Clearable, Act
                 }
             }
             model.fireTableDataChanged();
-        }).start();
+        });
+    }
+
+    /**
+     * Stops background refreshes when the visualizer is removed from an embedded host.
+     */
+    @Override
+    public void close() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        refreshTimer.stop();
+        clearData();
+        dataChanged = false;
     }
 
     @Override
