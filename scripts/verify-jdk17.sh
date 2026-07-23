@@ -15,4 +15,5 @@ fi
 
 cd "$PROJECT_DIR"
 ./gradlew test verifyPluginRuntime "$@" --console=plain
-exec "$SCRIPT_DIR/gui-smoke-jdk17.sh"
+"$SCRIPT_DIR/gui-smoke-jdk17.sh"
+exec "$SCRIPT_DIR/ide-ui-smoke-jdk17.sh"

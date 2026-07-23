@@ -1,5 +1,7 @@
 import org.jetbrains.intellij.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.tasks.DownloadRobotServerPluginTask
 import org.jetbrains.intellij.tasks.RunPluginVerifierTask
+import org.jetbrains.intellij.tasks.RunIdeForUiTestTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.zip.ZipFile
 
@@ -13,9 +15,11 @@ version = "0.1.12-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies")
 }
 
 val jmeterVersion = "5.6.3"
+val remoteRobotVersion = "0.11.23"
 
 val jmeterBridge by configurations.creating {
     isCanBeConsumed = false
@@ -29,6 +33,7 @@ val jmeterTestRuntime by configurations.creating {
 }
 
 val jmeterPluginTest by sourceSets.creating
+val ideUiTest by sourceSets.creating
 
 configurations.named(jmeterPluginTest.compileClasspathConfigurationName) {
     extendsFrom(jmeterTestRuntime)
@@ -66,6 +71,19 @@ dependencies {
     }
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+
+    add(
+        ideUiTest.implementationConfigurationName,
+        "com.intellij.remoterobot:remote-robot:$remoteRobotVersion",
+    )
+    add(
+        ideUiTest.implementationConfigurationName,
+        "com.intellij.remoterobot:remote-fixtures:$remoteRobotVersion",
+    )
+    add(ideUiTest.implementationConfigurationName, "com.squareup.okhttp3:okhttp:4.12.0")
+    add(ideUiTest.implementationConfigurationName, "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23")
+    add(ideUiTest.implementationConfigurationName, "org.junit.jupiter:junit-jupiter:5.10.3")
+    add(ideUiTest.runtimeOnlyConfigurationName, "org.slf4j:slf4j-simple:2.0.13")
 }
 
 kotlin {
@@ -93,6 +111,11 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 val testJMeterHome = layout.buildDirectory.dir("test-jmeter-home")
+val ideUiTestProject = layout.buildDirectory.dir("ide-ui-test/project")
+val ideUiTestReports = layout.buildDirectory.dir("reports/ide-ui-smoke")
+val ideUiTestSystem = layout.buildDirectory.dir("idea-sandbox/system-uiTest")
+val ideUiTestIdeaLog = ideUiTestSystem.map { it.file("log/idea.log") }
+val ideUiTestPort = providers.environmentVariable("JMETER_IDE_UI_PORT").orElse("8580")
 
 val jmeterTestPluginJar by tasks.registering(Jar::class) {
     archiveFileName.set("jmeter-viewer-test-plugin.jar")
@@ -137,13 +160,114 @@ val prepareJMeterTestHome by tasks.registering(Sync::class) {
     }
 }
 
-tasks.withType<Test>().configureEach {
+val prepareIdeUiTestProject by tasks.registering(Sync::class) {
+    into(ideUiTestProject)
+    from(layout.projectDirectory.dir("src/test/resources/jmx/smoke")) {
+        include("complex-localhost-plan.jmx", "users.csv")
+    }
+    doLast {
+        ideUiTestProject.get().file("clipboard-target.txt").asFile.writeText("")
+    }
+}
+
+tasks.named<Test>("test") {
     useJUnitPlatform()
     dependsOn(prepareJMeterTestHome)
     dependsOn(jmeterBridge)
     doFirst {
         systemProperty("jmeter.test.home", testJMeterHome.get().asFile.absolutePath)
         systemProperty("jmeter.bridge.jar", jmeterBridge.singleFile.absolutePath)
+    }
+}
+
+tasks.named<DownloadRobotServerPluginTask>("downloadRobotServerPlugin") {
+    version.set(remoteRobotVersion)
+}
+
+tasks.named<PrepareSandboxTask>("prepareUiTestingSandbox") {
+    dependsOn(prepareJMeterTestHome)
+    doLast {
+        val optionsDirectory = file(configDir.get()).resolve("options")
+        check(optionsDirectory.mkdirs() || optionsDirectory.isDirectory) {
+            "Could not create the IDE UI test settings directory: $optionsDirectory"
+        }
+        val escapedJMeterHome = testJMeterHome.get().asFile.absolutePath
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        optionsDirectory.resolve("jmeter-viewer.xml").writeText(
+            """
+            <application>
+              <component name="JMeterViewerSettings">
+                <option name="jmeterHome" value="$escapedJMeterHome" />
+              </component>
+            </application>
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
+tasks.named<RunIdeForUiTestTask>("runIdeForUiTests") {
+    dependsOn(prepareIdeUiTestProject)
+    dependsOn(prepareJMeterTestHome)
+    systemDir.set(ideUiTestSystem.map { it.asFile })
+    args(ideUiTestProject.get().asFile.absolutePath)
+
+    systemProperty("ide.browser.jcef.enabled", "false")
+    systemProperty("ide.mac.file.chooser.native", "false")
+    systemProperty("ide.mac.message.dialogs.as.sheets", "false")
+    systemProperty("ide.show.tips.on.startup.default.value", "false")
+    systemProperty("idea.trust.all.projects", "true")
+    systemProperty("jb.consents.confirmation.enabled", "false")
+    systemProperty("jb.privacy.policy.text", "<!--999.999-->")
+    systemProperty("jbScreenMenuBar.enabled", "false")
+    systemProperty("apple.laf.useScreenMenuBar", "false")
+
+    doFirst {
+        systemProperty("robot-server.port", ideUiTestPort.get())
+        ideUiTestIdeaLog.get().asFile.delete()
+    }
+}
+
+tasks.register<Test>("ideUiTest") {
+    group = "verification"
+    description = "Runs the real-IDE JMeter Swing keyboard and clipboard smoke test."
+    testClassesDirs = ideUiTest.output.classesDirs
+    classpath = ideUiTest.runtimeClasspath
+    dependsOn(ideUiTest.classesTaskName)
+    dependsOn(prepareIdeUiTestProject)
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+    maxParallelForks = 1
+    failFast = true
+    outputs.upToDateWhen { false }
+
+    reports {
+        junitXml.outputLocation.set(ideUiTestReports.map { it.dir("junit") })
+        html.outputLocation.set(ideUiTestReports.map { it.dir("tests") })
+    }
+
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+    }
+
+    doFirst {
+        systemProperty("remote-robot-url", "http://127.0.0.1:${ideUiTestPort.get()}")
+        systemProperty("jmeter.ide.ui.project.dir", ideUiTestProject.get().asFile.absolutePath)
+        systemProperty("jmeter.ide.ui.report.dir", ideUiTestReports.get().asFile.absolutePath)
+        systemProperty("jmeter.ide.ui.log.path", ideUiTestIdeaLog.get().asFile.absolutePath)
+    }
+}
+
+// Gradle IntelliJ Plugin 1.x prepends the regular instrumented test output to
+// every Test task after project evaluation. Restore this task's isolated source
+// set after all plugin callbacks have run so it cannot rediscover unit tests.
+gradle.projectsEvaluated {
+    tasks.named<Test>("ideUiTest") {
+        testClassesDirs = ideUiTest.output.classesDirs
+        classpath = ideUiTest.runtimeClasspath
     }
 }
 

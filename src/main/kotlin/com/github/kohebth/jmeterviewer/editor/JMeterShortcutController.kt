@@ -41,7 +41,12 @@ internal class JMeterShortcutController(
         (nativeBindings + hostBindings)
             .forEach { binding ->
                 val keyStroke = KeyStroke.getKeyStroke(binding.keyCode, binding.modifiers)
-                roots.distinct().forEach { root ->
+                val shortcutRoots = if (binding.command in TREE_ONLY_COMMANDS) {
+                    listOf(treeRoot)
+                } else {
+                    roots.distinct()
+                }
+                shortcutRoots.forEach { root ->
                     val action = object : DumbAwareAction() {
                         override fun actionPerformed(event: AnActionEvent) {
                             perform(binding, keyStroke)
